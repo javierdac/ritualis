@@ -31,7 +31,8 @@ export async function startSession(
       : { _id: dynamicId, $or: [{ isSeed: true }, { owner: v.id }] },
   ).lean();
   if (!d) return { ok: false, error: "Dinámica no encontrada" };
-  if (!d.columns || d.columns.length === 0) {
+  const mode = d.modo ?? "tablero";
+  if (mode === "tablero" && (!d.columns || d.columns.length === 0)) {
     return { ok: false, error: "Esta dinámica no tiene tablero en vivo" };
   }
 
@@ -53,7 +54,8 @@ export async function startSession(
     team: opts?.teamId || undefined,
     teamName,
     facilitator: v.id,
-    columns: d.columns,
+    columns: mode === "ruleta" ? [] : d.columns,
+    mode,
     phase: "brainstorm",
     votesPerUser: 3,
   });

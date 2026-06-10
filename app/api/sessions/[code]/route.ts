@@ -1,4 +1,4 @@
-import { randomUUID } from "crypto";
+import { randomInt, randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { dbConnect } from "@/lib/db";
@@ -75,6 +75,7 @@ async function buildState(session: SessionDoc, me: ParticipantDoc | null) {
       phase: session.phase,
       votesPerUser: session.votesPerUser,
       columns: session.columns,
+      mode: session.mode ?? "tablero",
       timer: {
         running: session.timerRunning,
         endsAt: session.timerEndsAt ? new Date(session.timerEndsAt).toISOString() : null,
@@ -114,6 +115,11 @@ async function buildState(session: SessionDoc, me: ParticipantDoc | null) {
       text: a.text,
       done: a.done,
     })),
+    wheel: {
+      currentId: session.wheelCurrent?.toString() ?? null,
+      spunAt: session.wheelSpunAt ? new Date(session.wheelSpunAt).toISOString() : null,
+      doneIds: (session.wheelDone ?? []).map((id) => id.toString()),
+    },
   };
 }
 
@@ -340,6 +346,41 @@ export async function POST(
           { $set: { timerRunning: false, timerRemainingSec: null, timerEndsAt: null } },
         );
       }
+      break;
+    }
+    case "spin": {
+      if (!isFac || session.mode !== "ruleta" || phase === "closed") break;
+      const parts = (await Participant.find({ session: session._id })
+        .sort({ createdAt: 1 })
+        .lean()) as ParticipantDoc[];
+      const now = Date.now();
+      const excluded = new Set((session.wheelDone ?? []).map((id) => id.toString()));
+      if (session.wheelCurrent) excluded.add(session.wheelCurrent.toString());
+      // Solo participantes presentes: girar hacia alguien que se fue frustra la ronda.
+      const candidates = parts.filter(
+        (p) =>
+          !excluded.has(p._id.toString()) &&
+          now - new Date(p.lastSeen).getTime() < ONLINE_MS,
+      );
+      if (candidates.length === 0) break;
+      const chosen = candidates[randomInt(candidates.length)];
+      await Session.updateOne(
+        { _id: session._id },
+        {
+          $set: { wheelCurrent: chosen._id, wheelSpunAt: new Date() },
+          ...(session.wheelCurrent
+            ? { $addToSet: { wheelDone: session.wheelCurrent } }
+            : {}),
+        },
+      );
+      break;
+    }
+    case "wheelReset": {
+      if (!isFac || session.mode !== "ruleta") break;
+      await Session.updateOne(
+        { _id: session._id },
+        { $set: { wheelCurrent: null, wheelSpunAt: null, wheelDone: [] } },
+      );
       break;
     }
     case "addAction": {

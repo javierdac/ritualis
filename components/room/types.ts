@@ -16,6 +16,7 @@ export interface RoomState {
     phase: Phase;
     votesPerUser: number;
     columns: Column[];
+    mode: "tablero" | "ruleta";
     timer: { running: boolean; endsAt: string | null; remainingSec: number | null };
     serverNow: string;
   };
@@ -45,6 +46,7 @@ export interface RoomState {
     votedByMe: boolean;
   }[];
   actions: { id: string; text: string; done: boolean }[];
+  wheel: { currentId: string | null; spunAt: string | null; doneIds: string[] };
 }
 
 /** Operación contra la API de la sala; devuelve el estado fresco o null si falló. */

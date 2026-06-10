@@ -212,13 +212,17 @@ export default function DinamicaDetalle({ d }: { d: DynamicDTO }) {
           )}
 
           <div className="space-y-3">
-            {d.columns && d.columns.length > 0 && (
+            {(d.modo === "ruleta" || (d.columns && d.columns.length > 0)) && (
               <StartSessionButton dynamicId={d._id} />
             )}
             <Button
               onClick={iniciar}
               size="lg"
-              variant={d.columns && d.columns.length > 0 ? "outline" : "default"}
+              variant={
+                d.modo === "ruleta" || (d.columns && d.columns.length > 0)
+                  ? "outline"
+                  : "default"
+              }
               className="w-full gap-2"
             >
               <Play className="h-5 w-5" /> Modo facilitador (solo timer)

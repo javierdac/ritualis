@@ -136,6 +136,7 @@ export interface IDynamic {
   pasos: IStep[];
   tips: string[];
   columns?: IColumn[];
+  modo?: "tablero" | "ruleta";
   isSeed: boolean;
   owner?: Types.ObjectId;
   createdAt: Date;
@@ -182,6 +183,7 @@ const DynamicSchema = new Schema<IDynamic>(
     pasos: [StepSchema],
     tips: [{ type: String }],
     columns: [ColumnSchema],
+    modo: { type: String, enum: ["tablero", "ruleta"] },
     isSeed: { type: Boolean, default: false, index: true },
     owner: { type: Schema.Types.ObjectId, ref: "User", index: true },
   },
@@ -201,11 +203,16 @@ export interface ISession {
   teamName?: string;
   facilitator: Types.ObjectId;
   columns: IColumn[];
+  mode: "tablero" | "ruleta";
   phase: SessionPhase;
   votesPerUser: number;
   timerEndsAt?: Date | null;
   timerRemainingSec?: number | null; // si está pausado
   timerRunning: boolean;
+  /* Estado de la ruleta de turnos (solo mode "ruleta") */
+  wheelCurrent?: Types.ObjectId | null;
+  wheelSpunAt?: Date | null;
+  wheelDone: Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -220,6 +227,7 @@ const SessionSchema = new Schema<ISession>(
     teamName: { type: String },
     facilitator: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     columns: [ColumnSchema],
+    mode: { type: String, enum: ["tablero", "ruleta"], default: "tablero" },
     phase: {
       type: String,
       enum: ["lobby", "brainstorm", "voting", "discuss", "closed"],
@@ -229,6 +237,9 @@ const SessionSchema = new Schema<ISession>(
     timerEndsAt: { type: Date, default: null },
     timerRemainingSec: { type: Number, default: null },
     timerRunning: { type: Boolean, default: false },
+    wheelCurrent: { type: Schema.Types.ObjectId, ref: "Participant", default: null },
+    wheelSpunAt: { type: Date, default: null },
+    wheelDone: [{ type: Schema.Types.ObjectId, ref: "Participant" }],
   },
   { timestamps: true },
 );

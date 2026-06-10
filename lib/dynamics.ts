@@ -844,6 +844,47 @@ export const DINAMICAS: Dinamica[] = [
     ],
   },
   {
+    id: "ruleta-de-turnos",
+    modo: "ruleta",
+    nombre: "Ruleta de Turnos",
+    resumen:
+      "Una ruleta en vivo con los nombres del equipo (e invitados que se suman por link): se gira y decide quién habla a continuación.",
+    ceremonias: ["daily"],
+    objetivos: ["alinear", "descontracturar"],
+    duracionMin: 15,
+    equipoMin: 3,
+    equipoMax: 15,
+    energia: "alta",
+    presencial: true,
+    remoto: true,
+    materiales: ["Sesión en vivo de Ritualis (la ruleta se arma sola con los participantes)"],
+    pasos: [
+      {
+        titulo: "Abrir la sala",
+        detalle:
+          "Iniciá la sesión en vivo y compartí el link. Cada persona que entra (incluidos invitados) aparece como un gajo de la ruleta con su color.",
+        duracionMin: 2,
+      },
+      {
+        titulo: "Girar y hablar",
+        detalle:
+          "El facilitador gira: la ruleta elige al azar entre quienes todavía no hablaron. La persona sorteada da su update y se vuelve a girar.",
+        duracionMin: 11,
+      },
+      {
+        titulo: "Cierre",
+        detalle:
+          "Cuando todos hablaron, la ronda queda completa. Los temas que surgieron van al panel de acciones para tratarlos después.",
+        duracionMin: 2,
+      },
+    ],
+    tips: [
+      "El orden impredecible mantiene a todos atentos: nadie puede 'ensayar su parte' mientras hablan los demás.",
+      "Solo sortea entre los presentes: si alguien se cae de la llamada, no frena la ronda.",
+      "Usá el timer de la sala para timeboxear cada turno (60-90 segundos).",
+    ],
+  },
+  {
     id: "pasa-la-posta",
     nombre: "Pasá la Posta",
     resumen:
