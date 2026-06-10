@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Dices, RotateCcw } from "lucide-react";
+import { Check, Dices, RotateCcw, Shuffle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RoomHeader } from "./room-header";
 import { ActionsPanel } from "./actions-panel";
@@ -112,11 +112,21 @@ export function Roulette({
               </Button>
               <Button
                 variant="outline"
-                className="gap-2"
+                size="icon"
+                title="Sortear todo el orden de una vez"
+                disabled={spinning || pending.length < 2}
+                onClick={() => op({ op: "shuffle" })}
+              >
+                <Shuffle className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                title="Reiniciar la ronda"
                 disabled={spinning || (done.size === 0 && !current)}
                 onClick={() => op({ op: "wheelReset" })}
               >
-                <RotateCcw className="h-4 w-4" /> Reiniciar
+                <RotateCcw className="h-4 w-4" />
               </Button>
             </div>
           )}
@@ -126,6 +136,7 @@ export function Roulette({
             {participants.map((p) => {
               const spoke = done.has(p.id);
               const isCurrent = p.id === wheel.currentId && !spinning;
+              const queuePos = wheel.queueIds.indexOf(p.id);
               return (
                 <li
                   key={p.id}
@@ -145,6 +156,11 @@ export function Roulette({
                   </span>
                   {!p.online && (
                     <span className="text-xs text-muted-foreground">ausente</span>
+                  )}
+                  {!spoke && !isCurrent && queuePos >= 0 && (
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {queuePos + 1}º
+                    </span>
                   )}
                   {spoke && <Check className="h-4 w-4 text-primary" />}
                 </li>

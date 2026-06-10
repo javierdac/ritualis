@@ -136,7 +136,7 @@ export interface IDynamic {
   pasos: IStep[];
   tips: string[];
   columns?: IColumn[];
-  modo?: "tablero" | "ruleta";
+  modo?: "tablero" | "ruleta" | "posta";
   isSeed: boolean;
   owner?: Types.ObjectId;
   createdAt: Date;
@@ -183,7 +183,7 @@ const DynamicSchema = new Schema<IDynamic>(
     pasos: [StepSchema],
     tips: [{ type: String }],
     columns: [ColumnSchema],
-    modo: { type: String, enum: ["tablero", "ruleta"] },
+    modo: { type: String, enum: ["tablero", "ruleta", "posta"] },
     isSeed: { type: Boolean, default: false, index: true },
     owner: { type: Schema.Types.ObjectId, ref: "User", index: true },
   },
@@ -203,16 +203,18 @@ export interface ISession {
   teamName?: string;
   facilitator: Types.ObjectId;
   columns: IColumn[];
-  mode: "tablero" | "ruleta";
+  mode: "tablero" | "ruleta" | "posta";
   phase: SessionPhase;
   votesPerUser: number;
   timerEndsAt?: Date | null;
   timerRemainingSec?: number | null; // si está pausado
   timerRunning: boolean;
-  /* Estado de la ruleta de turnos (solo mode "ruleta") */
+  /* Estado de la ronda de turnos (modes "ruleta" y "posta") */
   wheelCurrent?: Types.ObjectId | null;
   wheelSpunAt?: Date | null;
   wheelDone: Types.ObjectId[];
+  /** Orden pre-sorteado de próximos turnos (op shuffle); vacío = azar puro. */
+  wheelQueue: Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -227,7 +229,7 @@ const SessionSchema = new Schema<ISession>(
     teamName: { type: String },
     facilitator: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     columns: [ColumnSchema],
-    mode: { type: String, enum: ["tablero", "ruleta"], default: "tablero" },
+    mode: { type: String, enum: ["tablero", "ruleta", "posta"], default: "tablero" },
     phase: {
       type: String,
       enum: ["lobby", "brainstorm", "voting", "discuss", "closed"],
@@ -240,6 +242,7 @@ const SessionSchema = new Schema<ISession>(
     wheelCurrent: { type: Schema.Types.ObjectId, ref: "Participant", default: null },
     wheelSpunAt: { type: Date, default: null },
     wheelDone: [{ type: Schema.Types.ObjectId, ref: "Participant" }],
+    wheelQueue: [{ type: Schema.Types.ObjectId, ref: "Participant" }],
   },
   { timestamps: true },
 );

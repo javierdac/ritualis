@@ -886,9 +886,10 @@ export const DINAMICAS: Dinamica[] = [
   },
   {
     id: "pasa-la-posta",
+    modo: "posta",
     nombre: "Pasá la Posta",
     resumen:
-      "Juego de ritmo para la daily: quien tiene la 'posta' (pelota, objeto o emoji) habla y elige a quién pasársela. Nadie sabe cuándo le toca.",
+      "Juego de ritmo para la daily: quien tiene la 'posta' habla y elige a quién pasársela. Nadie sabe cuándo le toca. Jugable en vivo desde la sala.",
     ceremonias: ["daily"],
     objetivos: ["alinear", "descontracturar"],
     duracionMin: 12,
@@ -897,29 +898,32 @@ export const DINAMICAS: Dinamica[] = [
     energia: "alta",
     presencial: true,
     remoto: true,
-    materiales: ["Pelota u objeto (presencial) o mención/emoji (remoto)"],
+    materiales: [
+      "Sesión en vivo de Ritualis (o una pelota/objeto si es presencial sin pantalla)",
+    ],
     pasos: [
       {
         titulo: "Arranca cualquiera",
         detalle:
-          "El facilitador lanza la posta a alguien al azar. Esa persona hace su update corto.",
+          "El facilitador abre la sala, comparte el link y arranca al azar (o le pasa la posta a alguien). Esa persona hace su update corto.",
         duracionMin: 1,
       },
       {
         titulo: "Pasar la posta",
         detalle:
-          "Al terminar, se la pasa a alguien que todavía no habló (en remoto: lo nombra). El orden impredecible mantiene a todos atentos.",
+          "Al terminar, quien habló toca en pantalla a alguien que todavía no habló y le pasa el turno. El orden impredecible mantiene a todos atentos.",
         duracionMin: 10,
       },
       {
         titulo: "Cierre",
-        detalle: "El último se la devuelve al facilitador, que cierra con bloqueos pendientes.",
+        detalle:
+          "Cuando todos hablaron, la ronda queda completa. Los temas pendientes van al panel de acciones.",
         duracionMin: 1,
       },
     ],
     tips: [
       "Mata el 'ensayar mi parte mientras hablan los demás': nadie sabe cuándo le toca.",
-      "En remoto, nombrar al siguiente reemplaza a la pelota y funciona igual de bien.",
+      "A diferencia de la ruleta, acá el equipo controla el flujo: elegir a quién pasársela también es un gesto de atención.",
     ],
   },
   {

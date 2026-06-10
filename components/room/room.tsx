@@ -6,6 +6,7 @@ import { Centered } from "./centered";
 import { JoinScreen } from "./join-screen";
 import { Board } from "./board";
 import { Roulette } from "./roulette";
+import { Posta } from "./posta";
 import type { RoomState } from "./types";
 
 export function Room({ code, defaultName }: { code: string; defaultName?: string }) {
@@ -109,6 +110,10 @@ export function Room({ code, defaultName }: { code: string; defaultName?: string
 
   if (state.session.mode === "ruleta") {
     return <Roulette state={state} op={op} code={code} />;
+  }
+
+  if (state.session.mode === "posta") {
+    return <Posta state={state} op={op} code={code} />;
   }
 
   return <Board state={state} op={op} code={code} />;

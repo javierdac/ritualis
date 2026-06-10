@@ -40,6 +40,7 @@ const OPS = {
     action: z.enum(["start", "pause", "reset"]),
     minutes: z.number().min(0).max(480).optional(),
   }),
+  pass: z.object({ participantId: objectId }),
   addAction: z.object({ text: z.string().trim().min(1).max(300) }),
   toggleAction: z.object({ actionId: objectId }),
   deleteAction: z.object({ actionId: objectId }),
@@ -119,8 +120,27 @@ async function buildState(session: SessionDoc, me: ParticipantDoc | null) {
       currentId: session.wheelCurrent?.toString() ?? null,
       spunAt: session.wheelSpunAt ? new Date(session.wheelSpunAt).toISOString() : null,
       doneIds: (session.wheelDone ?? []).map((id) => id.toString()),
+      queueIds: (session.wheelQueue ?? []).map((id) => id.toString()),
     },
   };
+}
+
+const TURN_MODES = ["ruleta", "posta"];
+
+/** Participantes presentes que todavía no hablaron (ni tienen el turno). */
+async function turnCandidates(session: SessionDoc): Promise<ParticipantDoc[]> {
+  const parts = (await Participant.find({ session: session._id })
+    .sort({ createdAt: 1 })
+    .lean()) as ParticipantDoc[];
+  const now = Date.now();
+  const excluded = new Set((session.wheelDone ?? []).map((id) => id.toString()));
+  if (session.wheelCurrent) excluded.add(session.wheelCurrent.toString());
+  // Solo presentes: girar hacia alguien que se fue frustra la ronda.
+  return parts.filter(
+    (p) =>
+      !excluded.has(p._id.toString()) &&
+      now - new Date(p.lastSeen).getTime() < ONLINE_MS,
+  );
 }
 
 async function findParticipant(sessionId: unknown, token: string | null) {
@@ -349,25 +369,66 @@ export async function POST(
       break;
     }
     case "spin": {
-      if (!isFac || session.mode !== "ruleta" || phase === "closed") break;
-      const parts = (await Participant.find({ session: session._id })
-        .sort({ createdAt: 1 })
-        .lean()) as ParticipantDoc[];
-      const now = Date.now();
-      const excluded = new Set((session.wheelDone ?? []).map((id) => id.toString()));
-      if (session.wheelCurrent) excluded.add(session.wheelCurrent.toString());
-      // Solo participantes presentes: girar hacia alguien que se fue frustra la ronda.
-      const candidates = parts.filter(
-        (p) =>
-          !excluded.has(p._id.toString()) &&
-          now - new Date(p.lastSeen).getTime() < ONLINE_MS,
-      );
+      if (!isFac || !TURN_MODES.includes(session.mode) || phase === "closed") break;
+      const candidates = await turnCandidates(session);
       if (candidates.length === 0) break;
-      const chosen = candidates[randomInt(candidates.length)];
+      // Con orden pre-sorteado (shuffle), sigue la cola; si no, azar puro.
+      const queue = (session.wheelQueue ?? []).map((id) => id.toString());
+      const byId = new Map(candidates.map((c) => [c._id.toString(), c]));
+      const queued = queue.map((id) => byId.get(id)).find((c) => c !== undefined);
+      const chosen = queued ?? candidates[randomInt(candidates.length)];
       await Session.updateOne(
         { _id: session._id },
         {
-          $set: { wheelCurrent: chosen._id, wheelSpunAt: new Date() },
+          $set: {
+            wheelCurrent: chosen._id,
+            wheelSpunAt: new Date(),
+            wheelQueue: (session.wheelQueue ?? []).filter(
+              (id) => id.toString() !== chosen._id.toString(),
+            ),
+          },
+          ...(session.wheelCurrent
+            ? { $addToSet: { wheelDone: session.wheelCurrent } }
+            : {}),
+        },
+      );
+      break;
+    }
+    case "shuffle": {
+      if (!isFac || !TURN_MODES.includes(session.mode) || phase === "closed") break;
+      const candidates = await turnCandidates(session);
+      if (candidates.length === 0) break;
+      // Fisher-Yates con crypto.randomInt
+      for (let i = candidates.length - 1; i > 0; i--) {
+        const j = randomInt(i + 1);
+        [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+      }
+      await Session.updateOne(
+        { _id: session._id },
+        { $set: { wheelQueue: candidates.map((c) => c._id) } },
+      );
+      break;
+    }
+    case "pass": {
+      if (session.mode !== "posta" || phase === "closed") break;
+      // Pasa la posta quien la tiene (o el facilitador).
+      const holds = session.wheelCurrent?.toString() === me._id.toString();
+      if (!holds && !isFac) break;
+      const p = OPS.pass.safeParse(body);
+      if (!p.success) return badRequest(p.error);
+      const candidates = await turnCandidates(session);
+      const target = candidates.find((c) => c._id.toString() === p.data.participantId);
+      if (!target) break;
+      await Session.updateOne(
+        { _id: session._id },
+        {
+          $set: {
+            wheelCurrent: target._id,
+            wheelSpunAt: new Date(),
+            wheelQueue: (session.wheelQueue ?? []).filter(
+              (id) => id.toString() !== target._id.toString(),
+            ),
+          },
           ...(session.wheelCurrent
             ? { $addToSet: { wheelDone: session.wheelCurrent } }
             : {}),
@@ -376,10 +437,10 @@ export async function POST(
       break;
     }
     case "wheelReset": {
-      if (!isFac || session.mode !== "ruleta") break;
+      if (!isFac || !TURN_MODES.includes(session.mode)) break;
       await Session.updateOne(
         { _id: session._id },
-        { $set: { wheelCurrent: null, wheelSpunAt: null, wheelDone: [] } },
+        { $set: { wheelCurrent: null, wheelSpunAt: null, wheelDone: [], wheelQueue: [] } },
       );
       break;
     }

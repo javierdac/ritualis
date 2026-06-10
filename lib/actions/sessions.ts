@@ -54,7 +54,7 @@ export async function startSession(
     team: opts?.teamId || undefined,
     teamName,
     facilitator: v.id,
-    columns: mode === "ruleta" ? [] : d.columns,
+    columns: mode === "tablero" ? d.columns : [],
     mode,
     phase: "brainstorm",
     votesPerUser: 3,

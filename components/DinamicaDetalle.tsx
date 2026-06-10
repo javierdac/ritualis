@@ -212,14 +212,14 @@ export default function DinamicaDetalle({ d }: { d: DynamicDTO }) {
           )}
 
           <div className="space-y-3">
-            {(d.modo === "ruleta" || (d.columns && d.columns.length > 0)) && (
+            {((d.modo && d.modo !== "tablero") || (d.columns && d.columns.length > 0)) && (
               <StartSessionButton dynamicId={d._id} />
             )}
             <Button
               onClick={iniciar}
               size="lg"
               variant={
-                d.modo === "ruleta" || (d.columns && d.columns.length > 0)
+                (d.modo && d.modo !== "tablero") || (d.columns && d.columns.length > 0)
                   ? "outline"
                   : "default"
               }

@@ -53,10 +53,11 @@ export interface Dinamica {
   /** Columnas del tablero en vivo. Si no tiene (ni modo ruleta), no se puede correr como sesión. */
   columns?: Columna[];
   /**
-   * Modo de la sesión en vivo: "tablero" (columnas + cards, default) o
-   * "ruleta" (rueda de turnos con los participantes).
+   * Modo de la sesión en vivo: "tablero" (columnas + cards, default),
+   * "ruleta" (rueda de turnos al azar) o "posta" (cada quien elige a quién
+   * pasarle el turno).
    */
-  modo?: "tablero" | "ruleta";
+  modo?: "tablero" | "ruleta" | "posta";
 }
 
 export const CEREMONIA_LABEL: Record<Ceremonia, string> = {
