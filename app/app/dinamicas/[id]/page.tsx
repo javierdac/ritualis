@@ -10,7 +10,7 @@ export default async function Page({
 }) {
   const { id } = await params;
   const user = await requireUser();
-  const d = await getDynamic(user.id, id);
+  const d = await getDynamic(user.id, id, user.role === "admin");
   if (!d) notFound();
   return <DinamicaDetalle d={d} />;
 }

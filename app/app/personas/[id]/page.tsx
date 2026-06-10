@@ -14,7 +14,7 @@ export default async function PersonaPage({
 }) {
   const { id } = await params;
   const user = await requireUser();
-  const person = await getPerson(user.id, id);
+  const person = await getPerson(user.id, id, user.role === "admin");
   if (!person) notFound();
   const notes = await getNotes(id);
 

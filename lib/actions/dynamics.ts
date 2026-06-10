@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { dbConnect } from "@/lib/db";
 import { Dynamic } from "@/lib/models";
-import { requireUser } from "@/lib/session";
+import { getViewer } from "@/lib/session";
 import type { CrudResult } from "./projects";
 
 const stepSchema = z.object({

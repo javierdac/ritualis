@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { dbConnect } from "@/lib/db";
 import { Project, Team } from "@/lib/models";
-import { requireUser } from "@/lib/session";
+import { getViewer } from "@/lib/session";
 
 export type CrudResult = { ok: boolean; error?: string };
 
@@ -17,16 +17,17 @@ export async function saveProject(
   id: string | null,
   data: { name: string; description?: string },
 ): Promise<CrudResult> {
-  const user = await requireUser();
+  const v = await getViewer();
   const parsed = schema.safeParse(data);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message };
   }
   await dbConnect();
+  const own = v.isAdmin ? {} : { owner: v.id };
   if (id) {
-    await Project.updateOne({ _id: id, owner: user.id }, { $set: parsed.data });
+    await Project.updateOne({ _id: id, ...own }, { $set: parsed.data });
   } else {
-    await Project.create({ ...parsed.data, owner: user.id });
+    await Project.create({ ...parsed.data, owner: v.id });
   }
   revalidatePath("/app/proyectos");
   revalidatePath("/app");
@@ -34,12 +35,12 @@ export async function saveProject(
 }
 
 export async function deleteProject(id: string): Promise<CrudResult> {
-  const user = await requireUser();
+  const v = await getViewer();
   await dbConnect();
-  await Project.deleteOne({ _id: id, owner: user.id });
+  await Project.deleteOne({ _id: id, ...(v.isAdmin ? {} : { owner: v.id }) });
   // Quita el proyecto de los equipos que lo referencian.
   await Team.updateMany(
-    { owner: user.id, projects: id },
+    { ...(v.isAdmin ? {} : { owner: v.id }), projects: id },
     { $pull: { projects: id } },
   );
   revalidatePath("/app/proyectos");

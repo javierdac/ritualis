@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { dbConnect } from "@/lib/db";
 import { Person, Note } from "@/lib/models";
-import { requireUser } from "@/lib/session";
+import { getViewer } from "@/lib/session";
 import type { CrudResult } from "./projects";
 
 const schema = z.object({
@@ -18,17 +18,18 @@ export async function savePerson(
   id: string | null,
   data: { name: string; role?: string; email?: string; teams: string[] },
 ): Promise<CrudResult> {
-  const user = await requireUser();
+  const v = await getViewer();
   const parsed = schema.safeParse(data);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message };
   }
   await dbConnect();
+  const own = v.isAdmin ? {} : { owner: v.id };
   const payload = { ...parsed.data, email: parsed.data.email || undefined };
   if (id) {
-    await Person.updateOne({ _id: id, owner: user.id }, { $set: payload });
+    await Person.updateOne({ _id: id, ...own }, { $set: payload });
   } else {
-    await Person.create({ ...payload, owner: user.id });
+    await Person.create({ ...payload, owner: v.id });
   }
   revalidatePath("/app/personas");
   revalidatePath("/app");
@@ -36,9 +37,9 @@ export async function savePerson(
 }
 
 export async function deletePerson(id: string): Promise<CrudResult> {
-  const user = await requireUser();
+  const v = await getViewer();
   await dbConnect();
-  await Person.deleteOne({ _id: id, owner: user.id });
+  await Person.deleteOne({ _id: id, ...(v.isAdmin ? {} : { owner: v.id }) });
   await Note.deleteMany({ person: id });
   revalidatePath("/app/personas");
   revalidatePath("/app");
@@ -50,13 +51,16 @@ export async function addNote(
   personId: string,
   text: string,
 ): Promise<CrudResult> {
-  const user = await requireUser();
+  const v = await getViewer();
   if (text.trim().length < 1) return { ok: false, error: "Nota vacía" };
   await dbConnect();
-  // Verifica que la persona sea del usuario.
-  const person = await Person.findOne({ _id: personId, owner: user.id }).lean();
+  // Verifica acceso a la persona (el admin accede a todas).
+  const person = await Person.findOne({
+    _id: personId,
+    ...(v.isAdmin ? {} : { owner: v.id }),
+  }).lean();
   if (!person) return { ok: false, error: "Persona no encontrada" };
-  await Note.create({ person: personId, author: user.id, text: text.trim() });
+  await Note.create({ person: personId, author: v.id, text: text.trim() });
   revalidatePath(`/app/personas/${personId}`);
   return { ok: true };
 }
@@ -65,9 +69,9 @@ export async function deleteNote(
   noteId: string,
   personId: string,
 ): Promise<CrudResult> {
-  const user = await requireUser();
+  const v = await getViewer();
   await dbConnect();
-  await Note.deleteOne({ _id: noteId, author: user.id });
+  await Note.deleteOne({ _id: noteId, ...(v.isAdmin ? {} : { author: v.id }) });
   revalidatePath(`/app/personas/${personId}`);
   return { ok: true };
 }

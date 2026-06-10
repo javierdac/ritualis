@@ -1,5 +1,6 @@
 import { dbConnect } from "@/lib/db";
 import {
+  User,
   Project,
   Team,
   Person,
@@ -227,6 +228,19 @@ export async function getSessions(ownerId: string, isAdmin = false) {
     participants: pMap.get(String(s._id)) ?? 0,
     cards: cMap.get(String(s._id)) ?? 0,
     createdAt: (s.createdAt as Date).toISOString(),
+  }));
+}
+
+/* ───────────── Usuarios (solo admin) ───────────── */
+export async function getUsers() {
+  await dbConnect();
+  const users = await User.find({}).sort({ createdAt: -1 }).lean();
+  return users.map((u) => ({
+    _id: String(u._id),
+    name: u.name,
+    email: u.email,
+    role: (u.role ?? "member") as "admin" | "member",
+    createdAt: (u.createdAt as Date).toISOString(),
   }));
 }
 

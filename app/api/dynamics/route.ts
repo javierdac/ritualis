@@ -16,9 +16,10 @@ export async function GET(req: Request) {
   const q = url.searchParams.get("q")?.trim();
 
   await dbConnect();
-  const filter: Record<string, unknown> = {
-    $or: [{ isSeed: true }, { owner: session.user.id }],
-  };
+  const isAdmin = session.user.role === "admin";
+  const filter: Record<string, unknown> = isAdmin
+    ? {}
+    : { $or: [{ isSeed: true }, { owner: session.user.id }] };
   if (ceremonia) filter.ceremonias = ceremonia;
   if (q) {
     const rx = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");

@@ -20,7 +20,7 @@ const CEREMONIA_DESC: Record<Ceremonia, string> = {
 
 export default async function CeremoniasPage() {
   const user = await requireUser();
-  const all = await getDynamics(user.id);
+  const all = await getDynamics(user.id, undefined, user.role === "admin");
 
   const countByCeremonia = (c: Ceremonia) =>
     all.filter((d) => d.ceremonias.includes(c)).length;

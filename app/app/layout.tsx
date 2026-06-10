@@ -20,7 +20,7 @@ export default async function AppLayout({
           <RitualisMark className="h-9 w-9 text-primary" />
           <span className="font-brand text-lg tracking-[0.14em]">RITUALIS</span>
         </Link>
-        <SidebarNav />
+        <SidebarNav isAdmin={user.role === "admin"} />
         <div className="mt-auto px-2 pt-4 text-xs text-muted-foreground">
           Dinámicas para todas las ceremonias Scrum
         </div>

@@ -20,7 +20,7 @@ export default async function CeremoniaPage({
   const c = ceremonia as Ceremonia;
 
   const user = await requireUser();
-  const dynamics = await getDynamics(user.id, c);
+  const dynamics = await getDynamics(user.id, c, user.role === "admin");
   const st = CEREMONIA_STYLE[c];
 
   return (

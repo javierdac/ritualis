@@ -4,7 +4,7 @@ import { ProjectsManager } from "@/components/app/projects-manager";
 
 export default async function ProyectosPage() {
   const user = await requireUser();
-  const projects = await getProjects(user.id);
+  const projects = await getProjects(user.id, user.role === "admin");
   return (
     <div className="mx-auto max-w-4xl">
       <ProjectsManager projects={projects} />

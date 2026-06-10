@@ -10,6 +10,7 @@ import {
   FolderKanban,
   Users,
   UserRound,
+  Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -23,12 +24,17 @@ const ITEMS = [
   { href: "/app/personas", label: "Personas", icon: UserRound },
 ];
 
-export function SidebarNav() {
+const ADMIN_ITEMS = [
+  { href: "/app/usuarios", label: "Usuarios", icon: Shield, exact: false },
+];
+
+export function SidebarNav({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname();
+  const items = isAdmin ? [...ITEMS, ...ADMIN_ITEMS] : ITEMS;
 
   return (
     <nav className="flex flex-col gap-1">
-      {ITEMS.map(({ href, label, icon: Icon, exact }) => {
+      {items.map(({ href, label, icon: Icon, exact }) => {
         const active = exact
           ? pathname === href
           : pathname === href || pathname.startsWith(href + "/");
