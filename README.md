@@ -1,82 +1,96 @@
 # Ritualis
 
-A system to facilitate **all Scrum ceremonies** (Daily, Planning, Review,
-Retro, Refinement) with a library of dynamics, a facilitator mode with timer,
-live shared sessions, and management of projects, teams, and people.
+Sistema para facilitar **todas las ceremonias de Scrum** (Daily, Planning,
+Review, Retro, Refinement) con una biblioteca de dinámicas, un modo facilitador
+con temporizador, sesiones en vivo compartidas y gestión de proyectos, equipos
+y personas.
 
 ## Stack
 
 - **Next.js 16** (App Router) + **React 19** + **TypeScript**
 - **MongoDB** + **Mongoose**
-- **Auth.js v5** (credentials, open registration)
-- **shadcn/ui** + Tailwind CSS v4 — light/dark theme
-- **Zod** for validation
+- **Auth.js v5** (credenciales, registro abierto)
+- **shadcn/ui** + Tailwind CSS v4 — tema claro/oscuro
+- **Zod** para validación
 
-## Data model
+## Modelo de datos
 
 ```
-User (login)
-  ├── Projects
-  ├── Teams         (M:N with projects)
-  └── People        (M:N with teams)
-         └── Notes  (per person)
+User (login, con rol admin/usuario)
+  ├── Proyectos
+  ├── Equipos        (M:N con proyectos)
+  └── Personas       (M:N con equipos)
+         └── Notas    (por persona)
 
-Dynamics  → seed (17) + user-created, tagged by ceremony
-Ceremonies → each one independent, with its own set of dynamics
-Sessions  → live rooms shareable by code (/s/CODE)
+Dinámicas  → seed (34) + creadas por el usuario, etiquetadas por ceremonia
+Ceremonias → cada una independiente, con su propio set de dinámicas
+Sesiones   → salas en vivo compartibles por código (/s/CODE)
 ```
 
-## Getting started
+## Puesta en marcha
 
-Requires MongoDB running locally at `mongodb://127.0.0.1:27017`.
+Requiere MongoDB corriendo en local en `mongodb://127.0.0.1:27017`.
 
 ```bash
 npm install
-npm run seed     # loads the 17 base dynamics into Mongo
+npm run seed     # carga las 34 dinámicas base en Mongo
 npm run dev      # http://localhost:3000
 ```
 
-Copy `.env.example` to `.env.local` and fill in:
+Copiá `.env.example` a `.env.local` y completá:
 
 ```
 MONGODB_URI=mongodb://127.0.0.1:27017/ritualis
-AUTH_SECRET=<generated with: openssl rand -base64 32>
+AUTH_SECRET=<generado con: openssl rand -base64 32>
 AUTH_TRUST_HOST=true
 ```
 
-### Test user
+### Usuario de prueba
 
 ```
 test@ritualis.dev / secret123
 ```
 
-Or sign up for a new account at `/register`.
+O registrá una cuenta nueva en `/register`.
 
-## Project structure
+## Estructura del proyecto
 
-- `app/(auth)/` — login and registration
-- `app/app/` — protected area (dashboard, ceremonies, dynamics, CRUD screens)
-- `app/s/[code]/` — live session room, joinable by code
-- `app/api/` — auth, dynamics, and live session endpoints
-- `lib/models.ts` — Mongoose schemas
-- `lib/data.ts` — reads (server components)
+- `app/(auth)/` — login y registro
+- `app/app/` — área protegida (dashboard, ceremonias, dinámicas, pantallas CRUD)
+- `app/app/usuarios/` — gestión de usuarios (solo admin)
+- `app/s/[code]/` — sala de sesión en vivo, accesible por código
+- `app/api/` — endpoints de auth, dinámicas y sesiones en vivo
+- `lib/models.ts` — esquemas de Mongoose
+- `lib/data.ts` — lecturas (server components)
 - `lib/actions/` — server actions (CRUD)
-- `proxy.ts` — auth middleware protecting everything but static assets
-- `scripts/seed.ts` — dynamics seed (`npm run seed`)
+- `lib/session.ts` — helpers de sesión (`requireUser`, `requireAdmin`)
+- `proxy.ts` — middleware de auth que protege todo excepto los estáticos
+- `scripts/seed.ts` — seed de dinámicas (`npm run seed`)
+- `scripts/seed-dummy.ts` — datos de ejemplo para desarrollo (`npm run seed:dummy`)
 
-## Deployment
+## Despliegue
 
-The app is deployed on Vercel: **https://ritualis.vercel.app**.
+La app está desplegada en Vercel: **https://ritualis.vercel.app**.
 
-Required environment variables in production (Vercel → Settings →
-Environment Variables, or `vercel env add`):
+Variables de entorno requeridas en producción (Vercel → Settings →
+Environment Variables, o `vercel env add`):
 
-- `MONGODB_URI` — a production MongoDB connection string (e.g. MongoDB
-  Atlas: `mongodb+srv://…`). Remember to allow Vercel's IPs or use
-  `0.0.0.0/0` with strong credentials.
-- `AUTH_SECRET` — generate a fresh one with `openssl rand -base64 32`
-  (don't reuse the local one).
+- `MONGODB_URI` — string de conexión a un MongoDB de producción (por ejemplo
+  MongoDB Atlas: `mongodb+srv://…`). Acordate de habilitar las IPs de Vercel o
+  usar `0.0.0.0/0` con credenciales fuertes.
+- `AUTH_SECRET` — generá uno nuevo con `openssl rand -base64 32` (no reutilices
+  el local).
 - `AUTH_TRUST_HOST=true`
 
-After the first deploy, seed the base dynamics against the production
-database: `MONGODB_URI=<prod-uri> npm run seed`.
+Después del primer deploy, cargá las dinámicas base contra la base de
+producción: `MONGODB_URI=<uri-prod> npm run seed`.
+
+## Colaboración
+
+Las contribuciones son bienvenidas. Mirá la
+[guía de colaboración](./CONTRIBUTING.md) para el flujo de trabajo, las
+convenciones de código y cómo reportar bugs o proponer mejoras.
+
+## Licencia
+
+Distribuido bajo la licencia MIT. Ver [LICENSE](./LICENSE) para más detalles.
