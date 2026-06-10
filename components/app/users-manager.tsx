@@ -1,8 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, Pencil, Trash2, Shield, User as UserIcon } from "lucide-react";
-import { toast } from "sonner";
+import { Pencil, Trash2, Shield, User as UserIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,14 +13,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   Table,
   TableBody,
   TableCell,
@@ -30,6 +20,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  EntityDialog,
+  ManagerHeader,
+  useEntityManager,
+} from "@/components/app/entity-manager";
 import { saveUser, deleteUser } from "@/lib/actions/users";
 
 type UserRow = {
@@ -47,58 +42,29 @@ export function UsersManager({
   users: UserRow[];
   currentUserId: string;
 }) {
-  const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<UserRow | null>(null);
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"admin" | "member">("member");
-  const [saving, setSaving] = useState(false);
-
-  function openNew() {
-    setEditing(null);
-    setName("");
-    setEmail("");
-    setPassword("");
-    setRole("member");
-    setOpen(true);
-  }
-  function openEdit(u: UserRow) {
-    setEditing(u);
-    setName(u.name);
-    setEmail(u.email);
-    setPassword("");
-    setRole(u.role);
-    setOpen(true);
-  }
-  async function save() {
-    setSaving(true);
-    const res = await saveUser(editing?._id ?? null, { name, email, password, role });
-    setSaving(false);
-    if (res.ok) {
-      toast.success(editing ? "Usuario actualizado" : "Usuario creado");
-      setOpen(false);
-    } else toast.error(res.error ?? "Error");
-  }
-  async function remove(u: UserRow) {
-    const res = await deleteUser(u._id);
-    if (res.ok) toast.success("Usuario borrado");
-    else toast.error(res.error ?? "Error");
-  }
+  const m = useEntityManager<
+    UserRow,
+    { name: string; email: string; password: string; role: "admin" | "member" }
+  >({
+    empty: { name: "", email: "", password: "", role: "member" },
+    toForm: (u) => ({ name: u.name, email: u.email, password: "", role: u.role }),
+    save: (id, form) => saveUser(id, form),
+    remove: (u) => deleteUser(u._id),
+    labels: {
+      created: "Usuario creado",
+      updated: "Usuario actualizado",
+      deleted: "Usuario borrado",
+    },
+  });
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Usuarios</h1>
-          <p className="text-muted-foreground">
-            Cuentas que pueden iniciar sesión. Asigná rol Admin o Miembro.
-          </p>
-        </div>
-        <Button onClick={openNew} className="gap-1">
-          <Plus className="h-4 w-4" /> Nuevo usuario
-        </Button>
-      </div>
+      <ManagerHeader
+        title="Usuarios"
+        subtitle="Cuentas que pueden iniciar sesión. Asigná rol Admin o Miembro."
+        actionLabel="Nuevo usuario"
+        onNew={m.openNew}
+      />
 
       <div className="rounded-xl border">
         <Table>
@@ -133,7 +99,7 @@ export function UsersManager({
                 </TableCell>
                 <TableCell>
                   <div className="flex justify-end gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => openEdit(u)}>
+                    <Button variant="ghost" size="icon" onClick={() => m.openEdit(u)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
                     <Button
@@ -141,7 +107,7 @@ export function UsersManager({
                       size="icon"
                       className="text-destructive"
                       disabled={u._id === currentUserId}
-                      onClick={() => remove(u)}
+                      onClick={() => m.remove(u)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -153,68 +119,62 @@ export function UsersManager({
         </Table>
       </div>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editing ? "Editar usuario" : "Nuevo usuario"}</DialogTitle>
-            <DialogDescription>
-              {editing
-                ? "Cambiá el nombre, el rol o reseteá la contraseña."
-                : "Creá una cuenta de login con su rol."}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label>Nombre</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={!!editing}
-                placeholder={editing ? undefined : "persona@empresa.com"}
-              />
-              {editing && (
-                <p className="text-xs text-muted-foreground">
-                  El email no se puede cambiar.
-                </p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label>{editing ? "Nueva contraseña (opcional)" : "Contraseña"}</Label>
-              <Input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={editing ? "Dejar vacío para no cambiar" : ""}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Rol</Label>
-              <Select value={role} onValueChange={(v) => setRole(v as "admin" | "member")}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="member">Miembro</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={save} disabled={saving}>
-              {saving ? "Guardando…" : "Guardar"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <EntityDialog
+        open={m.open}
+        onOpenChange={m.setOpen}
+        title={m.editing ? "Editar usuario" : "Nuevo usuario"}
+        description={
+          m.editing
+            ? "Cambiá el nombre, el rol o reseteá la contraseña."
+            : "Creá una cuenta de login con su rol."
+        }
+        saving={m.saving}
+        onSave={m.save}
+      >
+        <div className="space-y-2">
+          <Label>Nombre</Label>
+          <Input value={m.form.name} onChange={(e) => m.patch({ name: e.target.value })} />
+        </div>
+        <div className="space-y-2">
+          <Label>Email</Label>
+          <Input
+            type="email"
+            value={m.form.email}
+            onChange={(e) => m.patch({ email: e.target.value })}
+            disabled={!!m.editing}
+            placeholder={m.editing ? undefined : "persona@empresa.com"}
+          />
+          {m.editing && (
+            <p className="text-xs text-muted-foreground">
+              El email no se puede cambiar.
+            </p>
+          )}
+        </div>
+        <div className="space-y-2">
+          <Label>{m.editing ? "Nueva contraseña (opcional)" : "Contraseña"}</Label>
+          <Input
+            type="password"
+            value={m.form.password}
+            onChange={(e) => m.patch({ password: e.target.value })}
+            placeholder={m.editing ? "Dejar vacío para no cambiar" : ""}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Rol</Label>
+          <Select
+            value={m.form.role}
+            onValueChange={(v) => m.patch({ role: v as "admin" | "member" })}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="member">Miembro</SelectItem>
+              <SelectItem value="admin">Admin</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </EntityDialog>
     </div>
   );
 }

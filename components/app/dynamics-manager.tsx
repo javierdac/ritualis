@@ -29,15 +29,22 @@ export function DynamicsManager() {
   const [cer, setCer] = useState<Ceremonia | null>(null);
   const [items, setItems] = useState<DynamicDTO[]>([]);
   const [total, setTotal] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [done, setDone] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<DynamicDTO | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // "Cargando" derivado: el skeleton se muestra hasta que el primer lote
+  // de la combinación actual de filtros terminó de llegar.
+  const filterKey = `${q}|${cer ?? ""}|${refreshKey}`;
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const loading = loadedKey !== filterKey;
+
   const skipRef = useRef(0);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const filterKeyRef = useRef(filterKey);
+  filterKeyRef.current = filterKey;
 
   const fetchBatch = useCallback(
     async (reset: boolean) => {
@@ -47,31 +54,30 @@ export function DynamicsManager() {
       if (q) params.set("q", q);
       const res = await fetch(`/api/dynamics?${params}`, { cache: "no-store" });
       const data = await res.json();
+      // Si los filtros cambiaron mientras la respuesta viajaba, descartarla:
+      // un lote del scroll con filtros viejos no debe mezclarse en la lista nueva.
+      if (filterKeyRef.current !== filterKey) return;
       const batch: DynamicDTO[] = data.items ?? [];
       setTotal(data.total ?? 0);
       setItems((prev) => (reset ? batch : [...prev, ...batch]));
       skipRef.current = skip + batch.length;
       setDone(skipRef.current >= (data.total ?? 0));
     },
-    [q, cer],
+    [q, cer, filterKey],
   );
 
   // Reset + primer lote cuando cambian filtros (con debounce en la búsqueda).
   useEffect(() => {
     let cancelled = false;
-    // Mostrar el skeleton mientras se trae el primer lote (fetch de datos).
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    setDone(false);
     const t = setTimeout(async () => {
       await fetchBatch(true);
-      if (!cancelled) setLoading(false);
+      if (!cancelled) setLoadedKey(filterKey);
     }, 250);
     return () => {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [fetchBatch, refreshKey]);
+  }, [fetchBatch, filterKey]);
 
   // Infinite scroll: cargar el siguiente lote al llegar al sentinel.
   useEffect(() => {

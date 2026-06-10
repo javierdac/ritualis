@@ -18,7 +18,9 @@ export function CardView({
   op: OpFn;
 }) {
   const [editing, setEditing] = useState(false);
-  const [text, setText] = useState(card.text);
+  // El texto se snapshotea al entrar en edición: el polling puede traer un
+  // card.text más nuevo mientras el form está cerrado.
+  const [text, setText] = useState("");
   const canEdit = (card.isMine || isFac) && phase !== "closed";
   const canVote = phase === "voting";
 
@@ -38,10 +40,7 @@ export function CardView({
               size="icon"
               variant="ghost"
               className="h-7 w-7"
-              onClick={() => {
-                setText(card.text);
-                setEditing(false);
-              }}
+              onClick={() => setEditing(false)}
             >
               <X className="h-4 w-4" />
             </Button>
@@ -79,7 +78,10 @@ export function CardView({
               {canEdit && (
                 <div className="flex opacity-0 transition group-hover:opacity-100">
                   <button
-                    onClick={() => setEditing(true)}
+                    onClick={() => {
+                      setText(card.text);
+                      setEditing(true);
+                    }}
                     className="rounded p-1 text-muted-foreground hover:text-foreground"
                   >
                     <Pencil className="h-3.5 w-3.5" />

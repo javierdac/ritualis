@@ -36,7 +36,7 @@ npm run seed     # loads the 17 base dynamics into Mongo
 npm run dev      # http://localhost:3000
 ```
 
-Variables in `.env.local`:
+Copy `.env.example` to `.env.local` and fill in:
 
 ```
 MONGODB_URI=mongodb://127.0.0.1:27017/ritualis
@@ -67,5 +67,16 @@ Or sign up for a new account at `/register`.
 ## Deployment
 
 The app is deployed on Vercel: **https://ritualis.vercel.app**.
-See [DEPLOY.md](DEPLOY.md) for environment setup and how to connect a
-production MongoDB database.
+
+Required environment variables in production (Vercel → Settings →
+Environment Variables, or `vercel env add`):
+
+- `MONGODB_URI` — a production MongoDB connection string (e.g. MongoDB
+  Atlas: `mongodb+srv://…`). Remember to allow Vercel's IPs or use
+  `0.0.0.0/0` with strong credentials.
+- `AUTH_SECRET` — generate a fresh one with `openssl rand -base64 32`
+  (don't reuse the local one).
+- `AUTH_TRUST_HOST=true`
+
+After the first deploy, seed the base dynamics against the production
+database: `MONGODB_URI=<prod-uri> npm run seed`.

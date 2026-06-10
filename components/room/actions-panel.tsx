@@ -18,6 +18,13 @@ export function ActionsPanel({
   op: OpFn;
 }) {
   const [text, setText] = useState("");
+
+  async function add() {
+    if (!text.trim()) return;
+    await op({ op: "addAction", text: text.trim() });
+    setText("");
+  }
+
   return (
     <div className="border-t bg-card/70 p-4">
       <div className="mx-auto max-w-3xl">
@@ -61,21 +68,11 @@ export function ActionsPanel({
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder="Nueva acción (con responsable y fecha)…"
-              onKeyDown={async (e) => {
-                if (e.key === "Enter" && text.trim()) {
-                  await op({ op: "addAction", text: text.trim() });
-                  setText("");
-                }
+              onKeyDown={(e) => {
+                if (e.key === "Enter") add();
               }}
             />
-            <Button
-              className="gap-1"
-              disabled={!text.trim()}
-              onClick={async () => {
-                await op({ op: "addAction", text: text.trim() });
-                setText("");
-              }}
-            >
+            <Button className="gap-1" disabled={!text.trim()} onClick={add}>
               <Plus className="h-4 w-4" /> Sumar
             </Button>
           </div>

@@ -17,10 +17,18 @@ export function Timer({
   const { timer } = session;
   const [now, setNow] = useState(() => Date.now());
 
+  // El reloj solo corre mientras el timer está activo; el primer tick va por
+  // setTimeout(0) para refrescar `now` apenas arranca sin setState sincrónico.
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 500);
-    return () => clearInterval(id);
-  }, []);
+    if (!timer.running) return;
+    const update = () => setNow(Date.now());
+    const first = setTimeout(update, 0);
+    const id = setInterval(update, 500);
+    return () => {
+      clearTimeout(first);
+      clearInterval(id);
+    };
+  }, [timer.running]);
 
   let remaining = 0;
   if (timer.running && timer.endsAt) {

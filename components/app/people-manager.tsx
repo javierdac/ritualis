@@ -1,20 +1,11 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { Plus, Pencil, Trash2, UserRound, StickyNote } from "lucide-react";
-import { toast } from "sonner";
+import { Pencil, Trash2, UserRound, StickyNote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -23,6 +14,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  EntityDialog,
+  ManagerEmptyState,
+  ManagerHeader,
+  useEntityManager,
+} from "@/components/app/entity-manager";
 import { savePerson, deletePerson } from "@/lib/actions/people";
 import type { PersonDTO, TeamDTO } from "@/lib/dto";
 
@@ -33,75 +30,50 @@ export function PeopleManager({
   people: PersonDTO[];
   teams: TeamDTO[];
 }) {
-  const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<PersonDTO | null>(null);
-  const [name, setName] = useState("");
-  const [role, setRole] = useState("");
-  const [email, setEmail] = useState("");
-  const [selTeams, setSelTeams] = useState<string[]>([]);
-  const [saving, setSaving] = useState(false);
+  const m = useEntityManager<
+    PersonDTO,
+    { name: string; role: string; email: string; teams: string[] }
+  >({
+    empty: { name: "", role: "", email: "", teams: [] },
+    toForm: (p) => ({
+      name: p.name,
+      role: p.role ?? "",
+      email: p.email ?? "",
+      teams: p.teams,
+    }),
+    save: (id, form) => savePerson(id, form),
+    remove: (p) => deletePerson(p._id),
+    labels: {
+      created: "Persona creada",
+      updated: "Persona actualizada",
+      deleted: "Persona borrada",
+    },
+  });
 
-  function openNew() {
-    setEditing(null);
-    setName("");
-    setRole("");
-    setEmail("");
-    setSelTeams([]);
-    setOpen(true);
-  }
-  function openEdit(p: PersonDTO) {
-    setEditing(p);
-    setName(p.name);
-    setRole(p.role ?? "");
-    setEmail(p.email ?? "");
-    setSelTeams(p.teams);
-    setOpen(true);
-  }
   function toggleTeam(id: string) {
-    setSelTeams((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
-  }
-  async function save() {
-    setSaving(true);
-    const res = await savePerson(editing?._id ?? null, {
-      name,
-      role,
-      email,
-      teams: selTeams,
+    m.patch({
+      teams: m.form.teams.includes(id)
+        ? m.form.teams.filter((x) => x !== id)
+        : [...m.form.teams, id],
     });
-    setSaving(false);
-    if (res.ok) {
-      toast.success(editing ? "Persona actualizada" : "Persona creada");
-      setOpen(false);
-    } else toast.error(res.error ?? "Error");
-  }
-  async function remove(p: PersonDTO) {
-    const res = await deletePerson(p._id);
-    if (res.ok) toast.success("Persona borrada");
-    else toast.error(res.error ?? "Error");
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Personas</h1>
-          <p className="text-muted-foreground">
-            Cargá miembros y asignalos a uno o varios equipos.
-          </p>
-        </div>
-        <Button onClick={openNew} className="gap-1">
-          <Plus className="h-4 w-4" /> Nueva persona
-        </Button>
-      </div>
+      <ManagerHeader
+        title="Personas"
+        subtitle="Cargá miembros y asignalos a uno o varios equipos."
+        actionLabel="Nueva persona"
+        onNew={m.openNew}
+      />
 
       {people.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed py-16 text-center">
-          <UserRound className="h-10 w-10 text-muted-foreground" />
-          <p className="text-muted-foreground">Todavía no cargaste personas.</p>
-          <Button onClick={openNew} variant="outline" className="gap-1">
-            <Plus className="h-4 w-4" /> Cargar la primera
-          </Button>
-        </div>
+        <ManagerEmptyState
+          icon={UserRound}
+          message="Todavía no cargaste personas."
+          actionLabel="Cargar la primera"
+          onNew={m.openNew}
+        />
       ) : (
         <div className="rounded-xl border">
           <Table>
@@ -145,14 +117,14 @@ export function PeopleManager({
                   </TableCell>
                   <TableCell>
                     <div className="flex justify-end gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(p)}>
+                      <Button variant="ghost" size="icon" onClick={() => m.openEdit(p)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
                         className="text-destructive"
-                        onClick={() => remove(p)}
+                        onClick={() => m.remove(p)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -165,63 +137,54 @@ export function PeopleManager({
         </div>
       )}
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editing ? "Editar persona" : "Nueva persona"}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label>Nombre</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Rol</Label>
-                <Input
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                  placeholder="Dev, PO, QA…"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Email</Label>
-                <Input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Equipos</Label>
-              {teams.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Creá un equipo primero para asignarlo.
-                </p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {teams.map((t) => (
-                    <button key={t._id} type="button" onClick={() => toggleTeam(t._id)}>
-                      <Badge variant={selTeams.includes(t._id) ? "default" : "outline"}>
-                        {t.name}
-                      </Badge>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+      <EntityDialog
+        open={m.open}
+        onOpenChange={m.setOpen}
+        title={m.editing ? "Editar persona" : "Nueva persona"}
+        saving={m.saving}
+        onSave={m.save}
+      >
+        <div className="space-y-2">
+          <Label>Nombre</Label>
+          <Input value={m.form.name} onChange={(e) => m.patch({ name: e.target.value })} />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Rol</Label>
+            <Input
+              value={m.form.role}
+              onChange={(e) => m.patch({ role: e.target.value })}
+              placeholder="Dev, PO, QA…"
+            />
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={save} disabled={saving}>
-              {saving ? "Guardando…" : "Guardar"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          <div className="space-y-2">
+            <Label>Email</Label>
+            <Input
+              type="email"
+              value={m.form.email}
+              onChange={(e) => m.patch({ email: e.target.value })}
+            />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Label>Equipos</Label>
+          {teams.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Creá un equipo primero para asignarlo.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {teams.map((t) => (
+                <button key={t._id} type="button" onClick={() => toggleTeam(t._id)}>
+                  <Badge variant={m.form.teams.includes(t._id) ? "default" : "outline"}>
+                    {t.name}
+                  </Badge>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </EntityDialog>
     </div>
   );
 }
