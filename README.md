@@ -1,36 +1,71 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Ritualis
 
-## Getting Started
+A system to facilitate **all Scrum ceremonies** (Daily, Planning, Review,
+Retro, Refinement) with a library of dynamics, a facilitator mode with timer,
+live shared sessions, and management of projects, teams, and people.
 
-First, run the development server:
+## Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Next.js 16** (App Router) + **React 19** + **TypeScript**
+- **MongoDB** + **Mongoose**
+- **Auth.js v5** (credentials, open registration)
+- **shadcn/ui** + Tailwind CSS v4 — light/dark theme
+- **Zod** for validation
+
+## Data model
+
+```
+User (login)
+  ├── Projects
+  ├── Teams         (M:N with projects)
+  └── People        (M:N with teams)
+         └── Notes  (per person)
+
+Dynamics  → seed (17) + user-created, tagged by ceremony
+Ceremonies → each one independent, with its own set of dynamics
+Sessions  → live rooms shareable by code (/s/CODE)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Getting started
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Requires MongoDB running locally at `mongodb://127.0.0.1:27017`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm install
+npm run seed     # loads the 17 base dynamics into Mongo
+npm run dev      # http://localhost:3000
+```
 
-## Learn More
+Variables in `.env.local`:
 
-To learn more about Next.js, take a look at the following resources:
+```
+MONGODB_URI=mongodb://127.0.0.1:27017/ritualis
+AUTH_SECRET=<generated with: openssl rand -base64 32>
+AUTH_TRUST_HOST=true
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Test user
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+test@ritualis.dev / secret123
+```
 
-## Deploy on Vercel
+Or sign up for a new account at `/register`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Project structure
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `app/(auth)/` — login and registration
+- `app/app/` — protected area (dashboard, ceremonies, dynamics, CRUD screens)
+- `app/s/[code]/` — live session room, joinable by code
+- `app/api/` — auth, dynamics, and live session endpoints
+- `lib/models.ts` — Mongoose schemas
+- `lib/data.ts` — reads (server components)
+- `lib/actions/` — server actions (CRUD)
+- `proxy.ts` — auth middleware protecting everything but static assets
+- `scripts/seed.ts` — dynamics seed (`npm run seed`)
+
+## Deployment
+
+The app is deployed on Vercel: **https://ritualis.vercel.app**.
+See [DEPLOY.md](DEPLOY.md) for environment setup and how to connect a
+production MongoDB database.
