@@ -4,7 +4,7 @@ import { randomInt } from "crypto";
 import { revalidatePath } from "next/cache";
 import { dbConnect } from "@/lib/db";
 import { Dynamic, Session, Team } from "@/lib/models";
-import { requireUser } from "@/lib/session";
+import { getViewer } from "@/lib/session";
 
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // sin O/0/I/1
 
@@ -22,13 +22,14 @@ export async function startSession(
   dynamicId: string,
   opts?: { teamId?: string },
 ): Promise<{ ok: boolean; code?: string; error?: string }> {
-  const user = await requireUser();
+  const v = await getViewer();
   await dbConnect();
 
-  const d = await Dynamic.findOne({
-    _id: dynamicId,
-    $or: [{ isSeed: true }, { owner: user.id }],
-  }).lean();
+  const d = await Dynamic.findOne(
+    v.isAdmin
+      ? { _id: dynamicId }
+      : { _id: dynamicId, $or: [{ isSeed: true }, { owner: v.id }] },
+  ).lean();
   if (!d) return { ok: false, error: "Dinámica no encontrada" };
   if (!d.columns || d.columns.length === 0) {
     return { ok: false, error: "Esta dinámica no tiene tablero en vivo" };
@@ -36,7 +37,10 @@ export async function startSession(
 
   let teamName: string | undefined;
   if (opts?.teamId) {
-    const team = await Team.findOne({ _id: opts.teamId, owner: user.id }).lean();
+    const team = await Team.findOne({
+      _id: opts.teamId,
+      ...(v.isAdmin ? {} : { owner: v.id }),
+    }).lean();
     teamName = team?.name;
   }
 
@@ -48,7 +52,7 @@ export async function startSession(
     ceremonia: d.ceremonias[0] ?? "retro",
     team: opts?.teamId || undefined,
     teamName,
-    facilitator: user.id,
+    facilitator: v.id,
     columns: d.columns,
     phase: "brainstorm",
     votesPerUser: 3,
@@ -59,10 +63,10 @@ export async function startSession(
 }
 
 export async function closeSession(code: string): Promise<{ ok: boolean }> {
-  const user = await requireUser();
+  const v = await getViewer();
   await dbConnect();
   await Session.updateOne(
-    { code, facilitator: user.id },
+    { code, ...(v.isAdmin ? {} : { facilitator: v.id }) },
     { $set: { phase: "closed", timerRunning: false } },
   );
   revalidatePath("/app/sesiones");

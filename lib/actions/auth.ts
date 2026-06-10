@@ -13,6 +13,11 @@ const registerSchema = z.object({
   password: z.string().min(6, "Mínimo 6 caracteres"),
 });
 
+const loginSchema = z.object({
+  email: z.string().email("Email inválido"),
+  password: z.string().min(1, "Ingresá tu contraseña"),
+});
+
 export type ActionState = { error?: string } | undefined;
 
 export async function registerUser(
@@ -59,8 +64,14 @@ export async function loginUser(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const email = String(formData.get("email") ?? "");
-  const password = String(formData.get("password") ?? "");
+  const parsed = loginSchema.safeParse({
+    email: formData.get("email"),
+    password: formData.get("password"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  }
+  const { email, password } = parsed.data;
 
   try {
     await signIn("credentials", { email, password, redirectTo: "/app" });

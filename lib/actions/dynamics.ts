@@ -35,22 +35,22 @@ export async function saveDynamic(
   id: string | null,
   data: DynamicInput,
 ): Promise<CrudResult> {
-  const user = await requireUser();
+  const v = await getViewer();
   const parsed = schema.safeParse(data);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message };
   }
   await dbConnect();
   if (id) {
-    // Solo puede editar dinámicas propias (no las seed).
     const existing = await Dynamic.findById(id).lean();
     if (!existing) return { ok: false, error: "No existe" };
-    if (existing.isSeed || String(existing.owner) !== user.id) {
+    // Miembro: solo sus propias (no seed). Admin: cualquiera.
+    if (!v.isAdmin && (existing.isSeed || String(existing.owner) !== v.id)) {
       return { ok: false, error: "No podés editar esta dinámica" };
     }
     await Dynamic.updateOne({ _id: id }, { $set: parsed.data });
   } else {
-    await Dynamic.create({ ...parsed.data, isSeed: false, owner: user.id });
+    await Dynamic.create({ ...parsed.data, isSeed: false, owner: v.id });
   }
   revalidatePath("/app/dinamicas");
   revalidatePath("/app/ceremonias");
@@ -58,11 +58,11 @@ export async function saveDynamic(
 }
 
 export async function deleteDynamic(id: string): Promise<CrudResult> {
-  const user = await requireUser();
+  const v = await getViewer();
   await dbConnect();
   const existing = await Dynamic.findById(id).lean();
   if (!existing) return { ok: false, error: "No existe" };
-  if (existing.isSeed || String(existing.owner) !== user.id) {
+  if (!v.isAdmin && (existing.isSeed || String(existing.owner) !== v.id)) {
     return { ok: false, error: "No podés borrar esta dinámica" };
   }
   await Dynamic.deleteOne({ _id: id });
@@ -73,7 +73,7 @@ export async function deleteDynamic(id: string): Promise<CrudResult> {
 
 /** Clona una dinámica seed como propia para poder editarla. */
 export async function cloneDynamic(id: string): Promise<CrudResult & { id?: string }> {
-  const user = await requireUser();
+  const v = await getViewer();
   await dbConnect();
   const src = await Dynamic.findById(id).lean();
   if (!src) return { ok: false, error: "No existe" };
@@ -90,7 +90,7 @@ export async function cloneDynamic(id: string): Promise<CrudResult & { id?: stri
     ...rest,
     nombre: `${(rest as { nombre: string }).nombre} (copia)`,
     isSeed: false,
-    owner: user.id,
+    owner: v.id,
   });
   revalidatePath("/app/dinamicas");
   return { ok: true, id: created._id.toString() };

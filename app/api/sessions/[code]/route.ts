@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { dbConnect } from "@/lib/db";
 import {
   Session,
@@ -19,6 +20,37 @@ const COLORS = [
 
 type SessionDoc = ISession & { _id: { toString(): string } };
 type ParticipantDoc = IParticipant & { _id: { toString(): string } };
+
+/* Esquemas de entrada por operación */
+const objectId = z.string().regex(/^[0-9a-f]{24}$/i, "ID inválido");
+
+const OPS = {
+  join: z.object({ name: z.string().trim().max(60).optional() }),
+  addCard: z.object({
+    column: z.string().min(1),
+    text: z.string().trim().min(1).max(500),
+  }),
+  editCard: z.object({ cardId: objectId, text: z.string().trim().min(1).max(500) }),
+  deleteCard: z.object({ cardId: objectId }),
+  vote: z.object({ cardId: objectId }),
+  setPhase: z.object({
+    phase: z.enum(["lobby", "brainstorm", "voting", "discuss", "closed"]),
+  }),
+  setTimer: z.object({
+    action: z.enum(["start", "pause", "reset"]),
+    minutes: z.number().min(0).max(480).optional(),
+  }),
+  addAction: z.object({ text: z.string().trim().min(1).max(300) }),
+  toggleAction: z.object({ actionId: objectId }),
+  deleteAction: z.object({ actionId: objectId }),
+};
+
+function badRequest(error: z.ZodError) {
+  return NextResponse.json(
+    { error: error.issues[0]?.message ?? "Datos inválidos" },
+    { status: 400 },
+  );
+}
 
 async function buildState(session: SessionDoc, me: ParticipantDoc | null) {
   const now = Date.now();
@@ -135,6 +167,8 @@ export async function POST(
 
   /* JOIN — no requiere token previo */
   if (op === "join") {
+    const parsed = OPS.join.safeParse(body);
+    if (!parsed.success) return badRequest(parsed.error);
     const authSession = await auth();
     const userId = authSession?.user?.id;
     const count = await Participant.countDocuments({ session: session._id });
@@ -149,7 +183,7 @@ export async function POST(
           name: existing.name,
         });
       }
-      const name = (body.name as string)?.trim() || authSession.user.name || "Anónimo";
+      const name = parsed.data.name || authSession.user.name || "Anónimo";
       const token = randomUUID();
       const isFacilitator = session.facilitator.toString() === userId;
       const created = await Participant.create({
@@ -169,7 +203,7 @@ export async function POST(
     }
 
     // Invitado: requiere nombre.
-    const name = (body.name as string)?.trim();
+    const name = parsed.data.name;
     if (!name) {
       return NextResponse.json({ error: "Necesitás un nombre" }, { status: 400 });
     }
@@ -203,14 +237,14 @@ export async function POST(
   switch (op) {
     case "addCard": {
       if (phase !== "brainstorm" && !isFac) break;
-      const column = String(body.column ?? "");
-      const text = String(body.text ?? "").trim();
-      if (!text) break;
+      const p = OPS.addCard.safeParse(body);
+      if (!p.success) return badRequest(p.error);
+      const { column, text } = p.data;
       if (!session.columns.some((c) => c.key === column)) break;
       await SessionCard.create({
         session: session._id,
         column,
-        text: text.slice(0, 500),
+        text,
         author: me._id,
         authorName: me.name,
         votes: [],
@@ -218,17 +252,19 @@ export async function POST(
       break;
     }
     case "editCard": {
-      const text = String(body.text ?? "").trim();
-      if (!text) break;
-      const card = await SessionCard.findOne({ _id: body.cardId, session: session._id });
+      const p = OPS.editCard.safeParse(body);
+      if (!p.success) return badRequest(p.error);
+      const card = await SessionCard.findOne({ _id: p.data.cardId, session: session._id });
       if (!card) break;
       if (card.author.toString() !== me._id.toString() && !isFac) break;
-      card.text = text.slice(0, 500);
+      card.text = p.data.text;
       await card.save();
       break;
     }
     case "deleteCard": {
-      const card = await SessionCard.findOne({ _id: body.cardId, session: session._id });
+      const p = OPS.deleteCard.safeParse(body);
+      if (!p.success) return badRequest(p.error);
+      const card = await SessionCard.findOne({ _id: p.data.cardId, session: session._id });
       if (!card) break;
       if (card.author.toString() !== me._id.toString() && !isFac) break;
       await card.deleteOne();
@@ -236,43 +272,47 @@ export async function POST(
     }
     case "vote": {
       if (phase !== "voting") break;
-      const card = await SessionCard.findOne({ _id: body.cardId, session: session._id });
-      if (!card) break;
-      const meIdStr = me._id.toString();
-      const already = card.votes.some(
-        (v: { toString(): string }) => v.toString() === meIdStr,
+      const p = OPS.vote.safeParse(body);
+      if (!p.success) return badRequest(p.error);
+      const cardFilter = { _id: p.data.cardId, session: session._id };
+      // Si ya había votado esta tarjeta, quitar el voto (atómico).
+      const removed = await SessionCard.updateOne(
+        { ...cardFilter, votes: me._id },
+        { $pull: { votes: me._id } },
       );
-      if (already) {
-        card.votes = card.votes.filter(
-          (v: { toString(): string }) => v.toString() !== meIdStr,
-        );
-        await card.save();
-      } else {
-        const used = await SessionCard.countDocuments({
-          session: session._id,
-          votes: me._id,
+      if (removed.modifiedCount === 0) {
+        // Agregar primero y verificar el cupo después: si requests concurrentes
+        // superaron votesPerUser, se revierte. Evita el check-then-write no atómico.
+        const added = await SessionCard.updateOne(cardFilter, {
+          $addToSet: { votes: me._id },
         });
-        if (used < session.votesPerUser) {
-          card.votes.push(me._id);
-          await card.save();
+        if (added.modifiedCount > 0) {
+          const used = await SessionCard.countDocuments({
+            session: session._id,
+            votes: me._id,
+          });
+          if (used > session.votesPerUser) {
+            await SessionCard.updateOne(cardFilter, { $pull: { votes: me._id } });
+          }
         }
       }
       break;
     }
     case "setPhase": {
       if (!isFac) break;
-      const next = String(body.phase ?? "");
-      if (["lobby", "brainstorm", "voting", "discuss", "closed"].includes(next)) {
-        await Session.updateOne({ _id: session._id }, { $set: { phase: next } });
-        session.phase = next as ISession["phase"];
-      }
+      const p = OPS.setPhase.safeParse(body);
+      if (!p.success) return badRequest(p.error);
+      await Session.updateOne({ _id: session._id }, { $set: { phase: p.data.phase } });
+      session.phase = p.data.phase;
       break;
     }
     case "setTimer": {
       if (!isFac) break;
-      const action = String(body.action ?? "");
+      const p = OPS.setTimer.safeParse(body);
+      if (!p.success) return badRequest(p.error);
+      const { action } = p.data;
       if (action === "start") {
-        const minutes = Number(body.minutes);
+        const minutes = p.data.minutes ?? 0;
         if (minutes > 0) {
           const endsAt = new Date(Date.now() + minutes * 60_000);
           await Session.updateOne(
@@ -303,17 +343,19 @@ export async function POST(
       break;
     }
     case "addAction": {
-      const text = String(body.text ?? "").trim();
-      if (!text) break;
+      const p = OPS.addAction.safeParse(body);
+      if (!p.success) return badRequest(p.error);
       await SessionAction.create({
         session: session._id,
-        text: text.slice(0, 300),
+        text: p.data.text,
         createdByName: me.name,
       });
       break;
     }
     case "toggleAction": {
-      const a = await SessionAction.findOne({ _id: body.actionId, session: session._id });
+      const p = OPS.toggleAction.safeParse(body);
+      if (!p.success) return badRequest(p.error);
+      const a = await SessionAction.findOne({ _id: p.data.actionId, session: session._id });
       if (a) {
         a.done = !a.done;
         await a.save();
@@ -322,7 +364,9 @@ export async function POST(
     }
     case "deleteAction": {
       if (!isFac) break;
-      await SessionAction.deleteOne({ _id: body.actionId, session: session._id });
+      const p = OPS.deleteAction.safeParse(body);
+      if (!p.success) return badRequest(p.error);
+      await SessionAction.deleteOne({ _id: p.data.actionId, session: session._id });
       break;
     }
     default:
