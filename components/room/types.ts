@@ -33,6 +33,7 @@ export interface RoomState {
     color: string;
     isFacilitator: boolean;
     isGuest: boolean;
+    isManual: boolean;
     online: boolean;
   }[];
   cards: {

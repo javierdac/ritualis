@@ -32,7 +32,13 @@ function fmt(seconds: number) {
   return `${sign}${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-export default function DinamicaDetalle({ d }: { d: DynamicDTO }) {
+export default function DinamicaDetalle({
+  d,
+  teams = [],
+}: {
+  d: DynamicDTO;
+  teams?: { id: string; name: string }[];
+}) {
   const [facilitando, setFacilitando] = useState(false);
   const [paso, setPaso] = useState(0);
   const [restante, setRestante] = useState(0);
@@ -213,7 +219,7 @@ export default function DinamicaDetalle({ d }: { d: DynamicDTO }) {
 
           <div className="space-y-3">
             {((d.modo && d.modo !== "tablero") || (d.columns && d.columns.length > 0)) && (
-              <StartSessionButton dynamicId={d._id} />
+              <StartSessionButton dynamicId={d._id} teams={teams} />
             )}
             <Button
               onClick={iniciar}

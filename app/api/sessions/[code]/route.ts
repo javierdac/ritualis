@@ -12,11 +12,9 @@ import {
 } from "@/lib/models";
 import { auth } from "@/auth";
 
+import { PARTICIPANT_COLORS as COLORS } from "@/lib/palette";
+
 const ONLINE_MS = 12_000;
-const COLORS = [
-  "#2563EB", "#F97316", "#10B981", "#8B5CF6", "#EC4899",
-  "#F59E0B", "#06B6D4", "#EF4444", "#84CC16", "#14B8A6",
-];
 
 type SessionDoc = ISession & { _id: { toString(): string } };
 type ParticipantDoc = IParticipant & { _id: { toString(): string } };
@@ -41,6 +39,8 @@ const OPS = {
     minutes: z.number().min(0).max(480).optional(),
   }),
   pass: z.object({ participantId: objectId }),
+  addPerson: z.object({ name: z.string().trim().min(1).max(60) }),
+  removePerson: z.object({ participantId: objectId }),
   addAction: z.object({ text: z.string().trim().min(1).max(300) }),
   toggleAction: z.object({ actionId: objectId }),
   deleteAction: z.object({ actionId: objectId }),
@@ -99,7 +99,9 @@ async function buildState(session: SessionDoc, me: ParticipantDoc | null) {
       color: p.color,
       isFacilitator: p.isFacilitator,
       isGuest: p.isGuest,
-      online: now - new Date(p.lastSeen).getTime() < ONLINE_MS,
+      isManual: !!p.isManual,
+      // Los manuales no pollean: cuentan como presentes hasta que los saquen.
+      online: !!p.isManual || now - new Date(p.lastSeen).getTime() < ONLINE_MS,
     })),
     cards: cards.map((c) => ({
       id: c._id.toString(),
@@ -139,8 +141,36 @@ async function turnCandidates(session: SessionDoc): Promise<ParticipantDoc[]> {
   return parts.filter(
     (p) =>
       !excluded.has(p._id.toString()) &&
-      now - new Date(p.lastSeen).getTime() < ONLINE_MS,
+      (p.isManual || now - new Date(p.lastSeen).getTime() < ONLINE_MS),
   );
+}
+
+function escapeRegex(s: string) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Si entra alguien con el nombre de un participante manual, reclama su lugar. */
+async function claimManual(
+  sessionId: unknown,
+  name: string,
+  userId?: string,
+): Promise<{ token: string; participantId: string; name: string } | null> {
+  const manual = await Participant.findOne({
+    session: sessionId,
+    isManual: true,
+    name: new RegExp(`^${escapeRegex(name.trim())}$`, "i"),
+  });
+  if (!manual) return null;
+  const token = randomUUID();
+  manual.token = token;
+  manual.isManual = false;
+  manual.lastSeen = new Date();
+  if (userId) {
+    manual.set("user", userId);
+    manual.isGuest = false;
+  }
+  await manual.save();
+  return { token, participantId: manual._id.toString(), name: manual.name };
 }
 
 async function findParticipant(sessionId: unknown, token: string | null) {
@@ -210,6 +240,8 @@ export async function POST(
         });
       }
       const name = parsed.data.name || authSession.user.name || "Anónimo";
+      const claimed = await claimManual(session._id, name, userId);
+      if (claimed) return NextResponse.json(claimed);
       const token = randomUUID();
       const isFacilitator = session.facilitator.toString() === userId;
       const created = await Participant.create({
@@ -233,6 +265,8 @@ export async function POST(
     if (!name) {
       return NextResponse.json({ error: "Necesitás un nombre" }, { status: 400 });
     }
+    const claimed = await claimManual(session._id, name);
+    if (claimed) return NextResponse.json(claimed);
     const token = randomUUID();
     const created = await Participant.create({
       session: session._id,
@@ -431,6 +465,56 @@ export async function POST(
           },
           ...(session.wheelCurrent
             ? { $addToSet: { wheelDone: session.wheelCurrent } }
+            : {}),
+        },
+      );
+      break;
+    }
+    case "addPerson": {
+      if (!isFac || !TURN_MODES.includes(session.mode) || phase === "closed") break;
+      const p = OPS.addPerson.safeParse(body);
+      if (!p.success) return badRequest(p.error);
+      const name = p.data.name;
+      const exists = await Participant.findOne({
+        session: session._id,
+        name: new RegExp(`^${escapeRegex(name)}$`, "i"),
+      });
+      if (exists) {
+        return NextResponse.json(
+          { error: "Ya hay alguien con ese nombre en la sala" },
+          { status: 400 },
+        );
+      }
+      const count = await Participant.countDocuments({ session: session._id });
+      await Participant.create({
+        session: session._id,
+        name,
+        isGuest: true,
+        isManual: true,
+        isFacilitator: false,
+        color: COLORS[count % COLORS.length],
+        token: randomUUID(),
+      });
+      break;
+    }
+    case "removePerson": {
+      if (!isFac || !TURN_MODES.includes(session.mode)) break;
+      const p = OPS.removePerson.safeParse(body);
+      if (!p.success) return badRequest(p.error);
+      // Solo se pueden sacar participantes manuales: los conectados se van solos.
+      const target = await Participant.findOne({
+        _id: p.data.participantId,
+        session: session._id,
+        isManual: true,
+      });
+      if (!target) break;
+      await target.deleteOne();
+      await Session.updateOne(
+        { _id: session._id },
+        {
+          $pull: { wheelDone: target._id, wheelQueue: target._id },
+          ...(session.wheelCurrent?.toString() === target._id.toString()
+            ? { $set: { wheelCurrent: null } }
             : {}),
         },
       );

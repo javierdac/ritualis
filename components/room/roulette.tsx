@@ -1,9 +1,10 @@
 "use client";
 
-import { Check, Dices, RotateCcw, Shuffle } from "lucide-react";
+import { Check, Dices, RotateCcw, Shuffle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RoomHeader } from "./room-header";
 import { ActionsPanel } from "./actions-panel";
+import { AddPerson } from "./add-person";
 import type { OpFn, RoomState } from "./types";
 
 const SPIN_MS = 3000;
@@ -131,6 +132,8 @@ export function Roulette({
             </div>
           )}
 
+          {isFac && !closed && <AddPerson op={op} />}
+
           {/* Lista de participantes */}
           <ul className="space-y-1.5">
             {participants.map((p) => {
@@ -150,8 +153,12 @@ export function Roulette({
                   />
                   <span className="flex-1 truncate">
                     {p.name}
-                    {p.isGuest && (
-                      <span className="text-xs text-muted-foreground"> · invitado</span>
+                    {p.isManual ? (
+                      <span className="text-xs text-muted-foreground"> · sin conectar</span>
+                    ) : (
+                      p.isGuest && (
+                        <span className="text-xs text-muted-foreground"> · invitado</span>
+                      )
                     )}
                   </span>
                   {!p.online && (
@@ -163,6 +170,15 @@ export function Roulette({
                     </span>
                   )}
                   {spoke && <Check className="h-4 w-4 text-primary" />}
+                  {isFac && p.isManual && !closed && (
+                    <button
+                      title="Sacar de la ronda"
+                      onClick={() => op({ op: "removePerson", participantId: p.id })}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </li>
               );
             })}

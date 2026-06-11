@@ -1,9 +1,10 @@
 "use client";
 
-import { Check, Dices, Mic, RotateCcw } from "lucide-react";
+import { Check, Dices, Mic, RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RoomHeader } from "./room-header";
 import { ActionsPanel } from "./actions-panel";
+import { AddPerson } from "./add-person";
 import type { OpFn, RoomState } from "./types";
 
 /**
@@ -72,11 +73,20 @@ export function Posta({
             const passable =
               canPass && p.online && !spoke && !isCurrent && p.id !== me?.id;
             return (
-              <button
+              <div
                 key={p.id}
-                disabled={!passable}
-                onClick={() => op({ op: "pass", participantId: p.id })}
-                className={`flex flex-col items-center gap-2 rounded-xl border p-4 text-center transition ${
+                role={passable ? "button" : undefined}
+                tabIndex={passable ? 0 : undefined}
+                onClick={passable ? () => op({ op: "pass", participantId: p.id }) : undefined}
+                onKeyDown={
+                  passable
+                    ? (e) => {
+                        if (e.key === "Enter" || e.key === " ")
+                          op({ op: "pass", participantId: p.id });
+                      }
+                    : undefined
+                }
+                className={`relative flex flex-col items-center gap-2 rounded-xl border p-4 text-center transition ${
                   isCurrent ? "border-primary bg-primary/5 shadow-sm" : ""
                 } ${spoke ? "opacity-40" : ""} ${
                   passable
@@ -84,6 +94,18 @@ export function Posta({
                     : "cursor-default"
                 }`}
               >
+                {isFac && p.isManual && !closed && (
+                  <button
+                    title="Sacar de la ronda"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      op({ op: "removePerson", participantId: p.id });
+                    }}
+                    className="absolute right-2 top-2 text-muted-foreground hover:text-destructive"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
                 <span
                   className="flex h-12 w-12 items-center justify-center rounded-full text-sm font-bold text-white"
                   style={{ backgroundColor: p.color }}
@@ -105,11 +127,13 @@ export function Posta({
                     "hablando"
                   ) : passable ? (
                     "pasarle la posta"
+                  ) : p.isManual ? (
+                    "sin conectar"
                   ) : (
                     "esperando"
                   )}
                 </span>
-              </button>
+              </div>
             );
           })}
         </div>
@@ -130,6 +154,12 @@ export function Posta({
             >
               <RotateCcw className="h-4 w-4" /> Reiniciar ronda
             </Button>
+          </div>
+        )}
+
+        {isFac && !closed && (
+          <div className="w-full max-w-xs">
+            <AddPerson op={op} />
           </div>
         )}
       </main>

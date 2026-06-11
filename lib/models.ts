@@ -255,6 +255,10 @@ export interface IParticipant {
   name: string;
   isGuest: boolean;
   isFacilitator: boolean;
+  /** Agregado a mano por el facilitador (o precargado desde un equipo): no
+   *  pollea, así que cuenta como presente hasta que lo saquen o alguien
+   *  reclame su lugar entrando con el mismo nombre. */
+  isManual: boolean;
   color: string;
   token: string;
   lastSeen: Date;
@@ -268,6 +272,7 @@ const ParticipantSchema = new Schema<IParticipant>(
     name: { type: String, required: true },
     isGuest: { type: Boolean, default: true },
     isFacilitator: { type: Boolean, default: false },
+    isManual: { type: Boolean, default: false },
     color: { type: String, default: "#2563EB" },
     token: { type: String, required: true, index: true },
     lastSeen: { type: Date, default: () => new Date() },

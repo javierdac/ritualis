@@ -1,10 +1,11 @@
 "use server";
 
-import { randomInt } from "crypto";
+import { randomInt, randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { dbConnect } from "@/lib/db";
-import { Dynamic, Session, Team } from "@/lib/models";
+import { Dynamic, Participant, Person, Session, Team } from "@/lib/models";
 import { getViewer } from "@/lib/session";
+import { PARTICIPANT_COLORS } from "@/lib/palette";
 
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // sin O/0/I/1
 
@@ -36,22 +37,26 @@ export async function startSession(
     return { ok: false, error: "Esta dinámica no tiene tablero en vivo" };
   }
 
+  let teamId: string | undefined;
   let teamName: string | undefined;
   if (opts?.teamId) {
     const team = await Team.findOne({
       _id: opts.teamId,
       ...(v.isAdmin ? {} : { owner: v.id }),
     }).lean();
-    teamName = team?.name;
+    if (team) {
+      teamId = team._id.toString();
+      teamName = team.name;
+    }
   }
 
   const code = await uniqueCode();
-  await Session.create({
+  const session = await Session.create({
     code,
     dynamic: d._id,
     dynamicName: d.nombre,
     ceremonia: d.ceremonias[0] ?? "retro",
-    team: opts?.teamId || undefined,
+    team: teamId,
     teamName,
     facilitator: v.id,
     columns: mode === "tablero" ? d.columns : [],
@@ -59,6 +64,25 @@ export async function startSession(
     phase: "brainstorm",
     votesPerUser: 3,
   });
+
+  // En modos de turnos, las personas del equipo entran precargadas como
+  // participantes manuales; quien abre el link con su nombre reclama su lugar.
+  if (teamId && mode !== "tablero") {
+    const people = await Person.find({ teams: teamId }).sort({ name: 1 }).lean();
+    if (people.length > 0) {
+      await Participant.insertMany(
+        people.map((p, i) => ({
+          session: session._id,
+          name: p.name,
+          isGuest: true,
+          isManual: true,
+          isFacilitator: false,
+          color: PARTICIPANT_COLORS[i % PARTICIPANT_COLORS.length],
+          token: randomUUID(),
+        })),
+      );
+    }
+  }
 
   revalidatePath("/app/sesiones");
   return { ok: true, code };
