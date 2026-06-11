@@ -1,6 +1,6 @@
 "use client";
 
-import { Users, Copy } from "lucide-react";
+import { Users, Copy, Square } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,12 +15,15 @@ export function RoomHeader({
   op,
   code,
   badge,
+  onClose,
   children,
 }: {
   state: RoomState;
   op: OpFn;
   code: string;
   badge: string;
+  /** Si viene, muestra el botón "Cerrar" (lo pasan ruleta/posta para el facilitador). */
+  onClose?: () => void;
   children?: React.ReactNode;
 }) {
   const { session, me, participants } = state;
@@ -75,6 +78,11 @@ export function RoomHeader({
         <Button variant="outline" size="sm" className="gap-1" onClick={copyLink}>
           <Copy className="h-4 w-4" /> Invitar
         </Button>
+        {onClose && (
+          <Button variant="outline" size="sm" className="gap-1" onClick={onClose}>
+            <Square className="h-4 w-4" /> Cerrar
+          </Button>
+        )}
         <ThemeToggle />
       </div>
 

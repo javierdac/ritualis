@@ -51,7 +51,17 @@ export function Roulette({
 
   return (
     <div className="flex min-h-screen flex-col">
-      <RoomHeader state={state} op={op} code={code} badge="Ruleta de turnos" />
+      <RoomHeader
+        state={state}
+        op={op}
+        code={code}
+        badge="Ruleta de turnos"
+        onClose={
+          isFac && !closed
+            ? () => op({ op: "setPhase", phase: "closed" })
+            : undefined
+        }
+      />
 
       <div className="border-b bg-muted/40 px-4 py-2 text-center text-sm text-muted-foreground">
         {closed
