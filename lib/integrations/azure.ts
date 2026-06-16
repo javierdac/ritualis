@@ -386,5 +386,6 @@ export async function fetchAzure(cfg: IntegrationConfig): Promise<ProviderResult
     note: stillSample.length
       ? `En vivo desde Azure DevOps: ${live.join(", ")}. Usa datos de ejemplo: ${stillSample.join(", ")}.`
       : "Todo en vivo desde Azure DevOps.",
+    live: { quality: qualityLive, blockers: blockersLive, flow: flowLive },
   };
 }

@@ -113,15 +113,58 @@ function AzureHelp() {
   );
 }
 
+function GithubHelp() {
+  return (
+    <div className="space-y-4">
+      <Step n={1} title="Necesitás un GitHub Project (v2)">
+        Las métricas de sprint no salen de los repos: salen de un{" "}
+        <ExtLink href="https://docs.github.com/issues/planning-and-tracking-with-projects">
+          GitHub Project
+        </ExtLink>{" "}
+        con un campo de tipo <strong>Iteration</strong> (los sprints) y un campo
+        numérico de puntos (ej. <code>Story Points</code> / <code>Estimate</code>
+        ). El campo <code>Status</code> (single-select) se usa para detectar
+        “terminado” y “en progreso”.
+      </Step>
+      <Step n={2} title="API base (opcional)">
+        Dejala vacía para github.com. Sólo completala en GitHub Enterprise
+        Server: <code>https://tu-host/api</code>.
+      </Step>
+      <Step n={3} title="PAT (Personal Access Token)">
+        Entrá a{" "}
+        <ExtLink href="https://github.com/settings/tokens">
+          github.com → Settings → Developer settings → Tokens
+        </ExtLink>
+        . Con un token <em>classic</em>, marcá los scopes <code>read:project</code>{" "}
+        y <code>repo</code>. Con uno <em>fine-grained</em>, dale permiso de
+        lectura a <strong>Projects</strong> (e Issues/Pull requests). Copiá el
+        token (sólo se ve una vez).
+      </Step>
+      <Step n={4} title="Owner (organización o usuario)">
+        Quién es dueño del Project. Si la URL es{" "}
+        <code>github.com/orgs/<strong>mi-org</strong>/projects/7</code>, el owner
+        es <code>mi-org</code>. Para un Project personal:{" "}
+        <code>github.com/users/<strong>mi-usuario</strong>/projects/7</code>.
+      </Step>
+      <Step n={5} title="Número del Project">
+        El número al final de la URL del Project:{" "}
+        <code>…/projects/<strong>7</strong></code> → <code>7</code>.
+      </Step>
+    </div>
+  );
+}
+
 export function IntegrationHelp({ provider }: { provider: Provider }) {
   if (provider === "sample") {
     return (
       <p className="text-sm text-muted-foreground">
         Los <strong>datos de ejemplo</strong> no necesitan configuración: el
-        dashboard se llena con valores de muestra. Elegí Jira o Azure DevOps
-        para conectar datos reales y ver acá los pasos.
+        dashboard se llena con valores de muestra. Elegí Jira, Azure DevOps o
+        GitHub para conectar datos reales y ver acá los pasos.
       </p>
     );
   }
-  return provider === "jira" ? <JiraHelp /> : <AzureHelp />;
+  if (provider === "jira") return <JiraHelp />;
+  if (provider === "github") return <GithubHelp />;
+  return <AzureHelp />;
 }

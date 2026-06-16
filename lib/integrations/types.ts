@@ -5,7 +5,7 @@
  * agregar un proveedor nuevo no toca la presentación. */
 
 export type MetricStatus = "green" | "yellow" | "red";
-export type IntegrationProvider = "sample" | "jira" | "azure";
+export type IntegrationProvider = "sample" | "jira" | "azure" | "github";
 
 export interface SummaryRow {
   /** Nombre de la métrica (Predictibilidad, Velocity, …). */
@@ -76,11 +76,32 @@ export interface MetricsSnapshot {
 /** Snapshot sin metadatos: lo que devuelve cada proveedor antes de sellar. */
 export type RawSnapshot = Omit<MetricsSnapshot, "meta">;
 
+/** Qué secciones del snapshot vinieron en vivo (vs. datos de ejemplo). Lo usa
+ *  el merge del overlay para decidir qué superponer. */
+export interface SectionLiveness {
+  quality?: boolean;
+  blockers?: boolean;
+  flow?: boolean;
+}
+
 /** Lo que devuelve un proveedor en vivo: el snapshot + una nota opcional
- *  (p. ej. qué secciones siguen usando datos de ejemplo). */
+ *  (p. ej. qué secciones siguen usando datos de ejemplo) + qué secciones son
+ *  reales (para fusionar con un overlay). */
 export interface ProviderResult {
   raw: RawSnapshot;
   note?: string;
+  live?: SectionLiveness;
+}
+
+/** Config de un overlay de GitHub que se superpone a un primario Jira/Azure. */
+export interface GithubOverlayConfig {
+  baseUrl?: string;
+  /** Owner (organización o usuario) del Project v2. */
+  project?: string;
+  /** Número del Project v2. */
+  board?: string;
+  /** PAT de GitHub. Nunca se expone al cliente. */
+  token?: string;
 }
 
 /** Config de conexión de un equipo con su herramienta de gestión. */
@@ -89,14 +110,16 @@ export interface IntegrationConfig {
   /** Nombre del proyecto del reporte. */
   scopeName: string;
   baseUrl?: string;
-  /** Project key (Jira) o nombre de proyecto (Azure DevOps). */
+  /** Project key (Jira), nombre de proyecto (Azure DevOps) u owner del Project v2 (GitHub). */
   project?: string;
-  /** Board / rapidViewId (Jira) o team (Azure DevOps). */
+  /** Board / rapidViewId (Jira), team (Azure DevOps) o número del Project v2 (GitHub). */
   board?: string;
-  /** Usuario/email (Jira) u organización (Azure DevOps). */
+  /** Usuario/email (Jira) u organización (Azure DevOps). No se usa en GitHub. */
   email?: string;
-  /** API token (Jira) o PAT (Azure DevOps). Nunca se expone al cliente. */
+  /** API token (Jira), PAT (Azure DevOps) o PAT (GitHub). Nunca se expone al cliente. */
   token?: string;
+  /** Overlay opcional de GitHub sobre un primario Jira/Azure (flujo + calidad). */
+  github?: GithubOverlayConfig;
 }
 
 /** Error de integración: el dispatcher lo captura y cae a datos de ejemplo. */

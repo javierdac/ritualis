@@ -97,18 +97,23 @@ const PersonSchema = new Schema<IPerson>(
 /* ───────────────────────── Connection (credenciales por usuario) ────────
    La conexión con Jira / Azure DevOps es POR USUARIO (cada uno usa su propia
    cuenta y token), no global ni por equipo. 1:1 con User. */
-export type IntegrationProvider = "sample" | "jira" | "azure";
+export type IntegrationProvider = "sample" | "jira" | "azure" | "github";
 
 export interface IConnection {
   _id: Types.ObjectId;
   owner: Types.ObjectId;
   provider: IntegrationProvider;
-  /** baseUrl de Jira u organización de Azure DevOps. */
+  /** baseUrl de Jira, organización de Azure DevOps o API base de GitHub Enterprise. */
   baseUrl?: string;
-  /** email (Jira) / organización (Azure DevOps, en baseUrl o acá). */
+  /** email (Jira) / organización (Azure DevOps, en baseUrl o acá). No se usa en GitHub. */
   email?: string;
-  /** API token (Jira) o PAT (Azure DevOps). No se expone al cliente. */
+  /** API token (Jira), PAT (Azure DevOps) o PAT (GitHub). No se expone al cliente. */
   token?: string;
+  /* Overlay de GitHub (credenciales por usuario, se suman al primario Jira/Azure). */
+  /** API base de GitHub Enterprise (vacío = github.com). */
+  githubBaseUrl?: string;
+  /** PAT de GitHub para el overlay. No se expone al cliente. */
+  githubToken?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -116,10 +121,12 @@ export interface IConnection {
 const ConnectionSchema = new Schema<IConnection>(
   {
     owner: { type: Schema.Types.ObjectId, ref: "User", required: true, unique: true, index: true },
-    provider: { type: String, enum: ["sample", "jira", "azure"], default: "sample" },
+    provider: { type: String, enum: ["sample", "jira", "azure", "github"], default: "sample" },
     baseUrl: { type: String, trim: true },
     email: { type: String, trim: true },
     token: { type: String },
+    githubBaseUrl: { type: String, trim: true },
+    githubToken: { type: String },
   },
   { timestamps: true },
 );
@@ -132,10 +139,15 @@ export interface IIntegration {
   _id: Types.ObjectId;
   project: Types.ObjectId;
   owner: Types.ObjectId;
-  /** Project key (Jira) o nombre de proyecto (Azure DevOps) en la herramienta. */
+  /** Project key (Jira), nombre de proyecto (Azure DevOps) u owner del Project v2 (GitHub). */
   externalProject?: string;
-  /** Board / rapidViewId (Jira) o team (Azure DevOps). */
+  /** Board / rapidViewId (Jira), team (Azure DevOps) o número del Project v2 (GitHub). */
   board?: string;
+  /* Mapeo del overlay de GitHub (por proyecto), cuando el primario es Jira/Azure. */
+  /** Owner (organización o usuario) del Project v2 de GitHub. */
+  githubOwner?: string;
+  /** Número del Project v2 de GitHub. */
+  githubProjectNumber?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -146,6 +158,8 @@ const IntegrationSchema = new Schema<IIntegration>(
     owner: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     externalProject: { type: String, trim: true },
     board: { type: String, trim: true },
+    githubOwner: { type: String, trim: true },
+    githubProjectNumber: { type: String, trim: true },
   },
   { timestamps: true },
 );

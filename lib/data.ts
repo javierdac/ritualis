@@ -214,6 +214,10 @@ export async function getIntegration(
     hasToken: Boolean(conn?.token),
     project: mapping?.externalProject,
     board: mapping?.board,
+    githubBaseUrl: conn?.githubBaseUrl,
+    hasGithubToken: Boolean(conn?.githubToken),
+    githubOwner: mapping?.githubOwner,
+    githubProjectNumber: mapping?.githubProjectNumber,
   };
 }
 
@@ -234,6 +238,17 @@ export async function getProjectMetrics(
     Connection.findOne({ owner: ownerId }).lean(),
     Integration.findOne({ project: projectId, owner: ownerId }).lean(),
   ]);
+  // Overlay de GitHub: sólo si hay PAT (por usuario) y mapeo (por proyecto).
+  const github =
+    conn?.githubToken && mapping?.githubOwner && mapping?.githubProjectNumber
+      ? {
+          baseUrl: conn.githubBaseUrl,
+          project: mapping.githubOwner,
+          board: mapping.githubProjectNumber,
+          token: conn.githubToken,
+        }
+      : undefined;
+
   return fetchMetrics({
     provider: (conn?.provider as MetricsSnapshot["meta"]["provider"]) ?? "sample",
     scopeName: project.name as string,
@@ -242,6 +257,7 @@ export async function getProjectMetrics(
     token: conn?.token,
     project: mapping?.externalProject,
     board: mapping?.board,
+    github,
   });
 }
 

@@ -6,7 +6,12 @@ import { MetricsDashboard } from "@/components/app/metrics-dashboard";
 import { MetricsToolbar } from "@/components/app/metrics-toolbar";
 
 const SOURCE_LABEL = { sample: "Datos de ejemplo", live: "En vivo" } as const;
-const PROVIDER_LABEL = { sample: "ejemplo", jira: "Jira", azure: "Azure DevOps" } as const;
+const PROVIDER_LABEL = {
+  sample: "ejemplo",
+  jira: "Jira",
+  azure: "Azure DevOps",
+  github: "GitHub",
+} as const;
 
 export default async function MetricasPage({
   searchParams,

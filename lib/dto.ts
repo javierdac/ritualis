@@ -32,7 +32,7 @@ export interface PersonDTO {
 
 export interface IntegrationDTO {
   /* Conexión por usuario (compartida entre sus equipos). */
-  provider: "sample" | "jira" | "azure";
+  provider: "sample" | "jira" | "azure" | "github";
   baseUrl?: string;
   email?: string;
   /** El token nunca viaja al cliente; sólo si ya hay uno guardado. */
@@ -40,6 +40,12 @@ export interface IntegrationDTO {
   /* Mapeo de este equipo dentro de la herramienta. */
   project?: string;
   board?: string;
+  /* Overlay opcional de GitHub sobre el primario Jira/Azure. */
+  githubBaseUrl?: string;
+  /** El PAT de GitHub nunca viaja al cliente; sólo si ya hay uno guardado. */
+  hasGithubToken: boolean;
+  githubOwner?: string;
+  githubProjectNumber?: string;
 }
 
 export interface NoteDTO {

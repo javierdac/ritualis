@@ -471,6 +471,7 @@ export async function fetchJira(cfg: IntegrationConfig): Promise<ProviderResult>
     note: sampleSections.length
       ? `En vivo desde Jira: ${liveSections.join(", ")}. Usa datos de ejemplo: ${sampleSections.join(", ")}.`
       : "Todo en vivo desde Jira.",
+    live: { quality: qualityLive, blockers: blockersLive, flow: flowLive },
   };
 }
 

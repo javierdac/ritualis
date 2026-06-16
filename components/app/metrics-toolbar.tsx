@@ -32,6 +32,7 @@ const PROVIDER_LABEL: Record<Provider, string> = {
   sample: "Datos de ejemplo",
   jira: "Jira",
   azure: "Azure DevOps",
+  github: "GitHub (Projects v2)",
 };
 
 export function MetricsToolbar({
@@ -60,7 +61,15 @@ export function MetricsToolbar({
     token: "",
     project: integration.project ?? "",
     board: integration.board ?? "",
+    githubBaseUrl: integration.githubBaseUrl ?? "",
+    githubToken: "",
+    githubOwner: integration.githubOwner ?? "",
+    githubProjectNumber: integration.githubProjectNumber ?? "",
   });
+  // Overlay de GitHub: activo si ya hay mapeo o token guardado.
+  const [ghOn, setGhOn] = useState(
+    Boolean(integration.hasGithubToken || integration.githubOwner),
+  );
 
   function patch(p: Partial<typeof form>) {
     setForm((f) => ({ ...f, ...p }));
@@ -79,7 +88,15 @@ export function MetricsToolbar({
 
   async function save() {
     setSaving(true);
-    const res = await saveIntegration(selectedProjectId, form);
+    // El overlay sólo aplica con primario Jira/Azure; apagado o no aplicable →
+    // limpiamos el mapeo del proyecto (el token guardado por usuario se conserva).
+    const overlay = ghOn && (form.provider === "jira" || form.provider === "azure");
+    const payload = {
+      ...form,
+      githubOwner: overlay ? form.githubOwner : "",
+      githubProjectNumber: overlay ? form.githubProjectNumber : "",
+    };
+    const res = await saveIntegration(selectedProjectId, payload);
     setSaving(false);
     if (res.ok) {
       toast.success("Integración guardada");
@@ -92,6 +109,7 @@ export function MetricsToolbar({
 
   const isJira = form.provider === "jira";
   const isAzure = form.provider === "azure";
+  const isGithub = form.provider === "github";
   const live = form.provider !== "sample";
 
   return (
@@ -194,27 +212,37 @@ export function MetricsToolbar({
                   </p>
                   <div className="space-y-3">
                     <div className="space-y-2">
-                      <Label>{isAzure ? "Organización (URL base)" : "URL base"}</Label>
+                      <Label>
+                        {isAzure
+                          ? "Organización (URL base)"
+                          : isGithub
+                            ? "API base (opcional · sólo Enterprise)"
+                            : "URL base"}
+                      </Label>
                       <Input
                         value={form.baseUrl}
                         onChange={(e) => patch({ baseUrl: e.target.value })}
                         placeholder={
                           isJira
                             ? "https://tuempresa.atlassian.net"
-                            : "https://dev.azure.com/tu-org"
+                            : isGithub
+                              ? "https://api.github.com"
+                              : "https://dev.azure.com/tu-org"
                         }
                       />
                     </div>
+                    {!isGithub && (
+                      <div className="space-y-2">
+                        <Label>{isAzure ? "Organización" : "Email"}</Label>
+                        <Input
+                          value={form.email}
+                          onChange={(e) => patch({ email: e.target.value })}
+                          placeholder={isJira ? "vos@empresa.com" : "tu-org"}
+                        />
+                      </div>
+                    )}
                     <div className="space-y-2">
-                      <Label>{isAzure ? "Organización" : "Email"}</Label>
-                      <Input
-                        value={form.email}
-                        onChange={(e) => patch({ email: e.target.value })}
-                        placeholder={isJira ? "vos@empresa.com" : "tu-org"}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>{isAzure ? "PAT" : "API token"}</Label>
+                      <Label>{isJira ? "API token" : "PAT"}</Label>
                       <Input
                         type="password"
                         value={form.token}
@@ -231,22 +259,102 @@ export function MetricsToolbar({
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label>Proyecto</Label>
+                    <Label>{isGithub ? "Owner (org o usuario)" : "Proyecto"}</Label>
                     <Input
                       value={form.project}
                       onChange={(e) => patch({ project: e.target.value })}
-                      placeholder={isJira ? "PROJ" : "Mi proyecto"}
+                      placeholder={isJira ? "PROJ" : isGithub ? "mi-org" : "Mi proyecto"}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>{isJira ? "Board (rapidViewId)" : "Team / board"}</Label>
+                    <Label>
+                      {isJira
+                        ? "Board (rapidViewId)"
+                        : isGithub
+                          ? "Número del Project"
+                          : "Team / board"}
+                    </Label>
                     <Input
                       value={form.board}
                       onChange={(e) => patch({ board: e.target.value })}
-                      placeholder={isJira ? "123" : "Mi equipo"}
+                      placeholder={isJira ? "123" : isGithub ? "7" : "Mi equipo"}
                     />
                   </div>
                 </div>
+
+                {(isJira || isAzure) && (
+                  <div className="rounded-lg border bg-muted/30 p-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium">Sumar GitHub (overlay)</p>
+                        <p className="text-xs text-muted-foreground">
+                          Superpone Cycle/Lead Time y Aging desde un GitHub
+                          Project. {PROVIDER_LABEL[form.provider]} sigue siendo el
+                          ancla de Velocity/Predictibilidad.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={ghOn}
+                        onClick={() => setGhOn((v) => !v)}
+                        className={`relative ml-3 h-5 w-9 shrink-0 rounded-full transition-colors ${
+                          ghOn ? "bg-primary" : "bg-muted-foreground/30"
+                        }`}
+                      >
+                        <span
+                          className={`absolute top-0.5 h-4 w-4 rounded-full bg-background transition-all ${
+                            ghOn ? "left-[18px]" : "left-0.5"
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    {ghOn && (
+                      <div className="mt-3 space-y-3">
+                        <div className="space-y-2">
+                          <Label>PAT de GitHub</Label>
+                          <Input
+                            type="password"
+                            value={form.githubToken}
+                            onChange={(e) => patch({ githubToken: e.target.value })}
+                            placeholder={
+                              integration.hasGithubToken
+                                ? "•••••••• (dejá vacío para no cambiar)"
+                                : "Pegá tu PAT (scope read:project)"
+                            }
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-2">
+                            <Label>Owner (org o usuario)</Label>
+                            <Input
+                              value={form.githubOwner}
+                              onChange={(e) => patch({ githubOwner: e.target.value })}
+                              placeholder="mi-org"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Número del Project</Label>
+                            <Input
+                              value={form.githubProjectNumber}
+                              onChange={(e) => patch({ githubProjectNumber: e.target.value })}
+                              placeholder="7"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>API base (opcional · sólo Enterprise)</Label>
+                          <Input
+                            value={form.githubBaseUrl}
+                            onChange={(e) => patch({ githubBaseUrl: e.target.value })}
+                            placeholder="https://api.github.com"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </div>
