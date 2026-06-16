@@ -10,6 +10,7 @@ import {
   FolderKanban,
   Users,
   UserRound,
+  BarChart3,
   Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,7 @@ const ITEMS = [
   { href: "/app/proyectos", label: "Proyectos", icon: FolderKanban },
   { href: "/app/equipos", label: "Equipos", icon: Users },
   { href: "/app/personas", label: "Personas", icon: UserRound },
+  { href: "/app/metricas", label: "Métricas", icon: BarChart3 },
 ];
 
 const ADMIN_ITEMS = [

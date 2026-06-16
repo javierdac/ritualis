@@ -21,21 +21,28 @@ import {
   useEntityManager,
 } from "@/components/app/entity-manager";
 import { saveTeam, deleteTeam } from "@/lib/actions/teams";
-import type { TeamDTO, ProjectDTO } from "@/lib/dto";
+import type { TeamDTO, ProjectDTO, PersonDTO } from "@/lib/dto";
 
 export function TeamsManager({
   teams,
   projects,
+  people,
 }: {
   teams: TeamDTO[];
   projects: ProjectDTO[];
+  people: PersonDTO[];
 }) {
   const m = useEntityManager<
     TeamDTO,
-    { name: string; description: string; projects: string[] }
+    { name: string; description: string; projects: string[]; members: string[] }
   >({
-    empty: { name: "", description: "", projects: [] },
-    toForm: (t) => ({ name: t.name, description: t.description ?? "", projects: t.projects }),
+    empty: { name: "", description: "", projects: [], members: [] },
+    toForm: (t) => ({
+      name: t.name,
+      description: t.description ?? "",
+      projects: t.projects,
+      members: t.members,
+    }),
     save: (id, form) => saveTeam(id, form),
     remove: (t) => deleteTeam(t._id),
     labels: {
@@ -50,6 +57,14 @@ export function TeamsManager({
       projects: m.form.projects.includes(id)
         ? m.form.projects.filter((x) => x !== id)
         : [...m.form.projects, id],
+    });
+  }
+
+  function toggleMember(id: string) {
+    m.patch({
+      members: m.form.members.includes(id)
+        ? m.form.members.filter((x) => x !== id)
+        : [...m.form.members, id],
     });
   }
 
@@ -159,6 +174,24 @@ export function TeamsManager({
               {projects.map((p) => (
                 <button key={p._id} type="button" onClick={() => toggleProject(p._id)}>
                   <Badge variant={m.form.projects.includes(p._id) ? "default" : "outline"}>
+                    {p.name}
+                  </Badge>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="space-y-2">
+          <Label>Personas</Label>
+          {people.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Cargá una persona primero para asignarla.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {people.map((p) => (
+                <button key={p._id} type="button" onClick={() => toggleMember(p._id)}>
+                  <Badge variant={m.form.members.includes(p._id) ? "default" : "outline"}>
                     {p.name}
                   </Badge>
                 </button>

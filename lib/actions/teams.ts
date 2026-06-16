@@ -11,11 +11,12 @@ const schema = z.object({
   name: z.string().min(2, "Nombre muy corto"),
   description: z.string().optional(),
   projects: z.array(z.string()).default([]),
+  members: z.array(z.string()).default([]),
 });
 
 export async function saveTeam(
   id: string | null,
-  data: { name: string; description?: string; projects: string[] },
+  data: { name: string; description?: string; projects: string[]; members: string[] },
 ): Promise<CrudResult> {
   const v = await getViewer();
   const parsed = schema.safeParse(data);
@@ -24,12 +25,25 @@ export async function saveTeam(
   }
   await dbConnect();
   const own = v.isAdmin ? {} : { owner: v.id };
+  const { members, ...teamData } = parsed.data;
+  let teamId = id;
   if (id) {
-    await Team.updateOne({ _id: id, ...own }, { $set: parsed.data });
+    await Team.updateOne({ _id: id, ...own }, { $set: teamData });
   } else {
-    await Team.create({ ...parsed.data, owner: v.id });
+    const created = await Team.create({ ...teamData, owner: v.id });
+    teamId = String(created._id);
   }
+  // Reconcilia la pertenencia desde el lado del equipo (Person.teams es el M:N).
+  await Person.updateMany(
+    { _id: { $in: members }, ...own },
+    { $addToSet: { teams: teamId } },
+  );
+  await Person.updateMany(
+    { teams: teamId, _id: { $nin: members }, ...own },
+    { $pull: { teams: teamId } },
+  );
   revalidatePath("/app/equipos");
+  revalidatePath("/app/personas");
   revalidatePath("/app");
   return { ok: true };
 }

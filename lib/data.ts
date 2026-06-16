@@ -4,6 +4,8 @@ import {
   Project,
   Team,
   Person,
+  Connection,
+  Integration,
   Note,
   Dynamic,
   Session,
@@ -17,8 +19,11 @@ import type {
   PersonDTO,
   NoteDTO,
   DynamicDTO,
+  IntegrationDTO,
 } from "@/lib/dto";
 import type { Ceremonia } from "@/lib/types";
+import { fetchMetrics } from "@/lib/integrations/provider";
+import type { MetricsSnapshot } from "@/lib/integrations/types";
 
 /* Scope por dueño (los admin ven todo). */
 function scope(ownerId: string, isAdmin: boolean): Record<string, unknown> {
@@ -59,12 +64,14 @@ export async function getTeams(
     .sort({ createdAt: -1 })
     .populate("projects", "name")
     .lean();
-  const memberCounts = await Person.aggregate([
+  const memberAgg = await Person.aggregate([
     { $match: matchScope(ownerId, isAdmin) },
     { $unwind: "$teams" },
-    { $group: { _id: "$teams", count: { $sum: 1 } } },
+    { $group: { _id: "$teams", members: { $push: "$_id" } } },
   ]);
-  const map = new Map(memberCounts.map((t) => [String(t._id), t.count]));
+  const map = new Map(
+    memberAgg.map((t) => [String(t._id), t.members.map(String) as string[]]),
+  );
   return teams.map((t) => {
     const s = serialize(t) as unknown as {
       _id: string;
@@ -73,13 +80,15 @@ export async function getTeams(
       projects: { _id: string; name: string }[];
       createdAt: string;
     };
+    const members = map.get(s._id) ?? [];
     return {
       _id: s._id,
       name: s.name,
       description: s.description,
       projects: s.projects.map((p) => p._id),
       projectNames: s.projects,
-      memberCount: map.get(s._id) ?? 0,
+      members,
+      memberCount: members.length,
       createdAt: s.createdAt,
     } satisfies TeamDTO;
   });
@@ -169,6 +178,70 @@ export async function getNotes(personId: string): Promise<NoteDTO[]> {
       authorName: s.author?.name ?? "—",
       createdAt: s.createdAt,
     };
+  });
+}
+
+/* ───────────── Métricas / Integraciones ───────────── */
+
+/** Proyectos a los que el usuario puede mirar métricas (id + nombre). */
+export async function getProjectOptions(
+  ownerId: string,
+  isAdmin = false,
+): Promise<{ _id: string; name: string }[]> {
+  await dbConnect();
+  const projects = await Project.find(scope(ownerId, isAdmin))
+    .sort({ name: 1 })
+    .select("name")
+    .lean();
+  return projects.map((p) => ({ _id: String(p._id), name: p.name as string }));
+}
+
+/** Config de integración para el formulario: conexión del usuario (por
+ *  usuario) + mapeo del proyecto. Nunca expone el token. */
+export async function getIntegration(
+  ownerId: string,
+  projectId: string,
+): Promise<IntegrationDTO> {
+  await dbConnect();
+  const [conn, mapping] = await Promise.all([
+    Connection.findOne({ owner: ownerId }).lean(),
+    Integration.findOne({ project: projectId, owner: ownerId }).lean(),
+  ]);
+  return {
+    provider: (conn?.provider as IntegrationDTO["provider"]) ?? "sample",
+    baseUrl: conn?.baseUrl,
+    email: conn?.email,
+    hasToken: Boolean(conn?.token),
+    project: mapping?.externalProject,
+    board: mapping?.board,
+  };
+}
+
+/** Snapshot de métricas del proyecto, combinando la conexión del usuario con
+ *  el mapeo del proyecto. */
+export async function getProjectMetrics(
+  ownerId: string,
+  projectId: string,
+  isAdmin = false,
+): Promise<MetricsSnapshot | null> {
+  await dbConnect();
+  const project = await Project.findOne({ _id: projectId, ...scope(ownerId, isAdmin) })
+    .select("name")
+    .lean();
+  if (!project) return null;
+  // Las credenciales son del usuario que mira; el mapeo es del proyecto.
+  const [conn, mapping] = await Promise.all([
+    Connection.findOne({ owner: ownerId }).lean(),
+    Integration.findOne({ project: projectId, owner: ownerId }).lean(),
+  ]);
+  return fetchMetrics({
+    provider: (conn?.provider as MetricsSnapshot["meta"]["provider"]) ?? "sample",
+    scopeName: project.name as string,
+    baseUrl: conn?.baseUrl,
+    email: conn?.email,
+    token: conn?.token,
+    project: mapping?.externalProject,
+    board: mapping?.board,
   });
 }
 

@@ -14,6 +14,7 @@ export interface TeamDTO {
   description?: string;
   projects: string[];
   projectNames: { _id: string; name: string }[];
+  members: string[];
   memberCount?: number;
   createdAt: string;
 }
@@ -27,6 +28,18 @@ export interface PersonDTO {
   teamNames: { _id: string; name: string }[];
   noteCount?: number;
   createdAt: string;
+}
+
+export interface IntegrationDTO {
+  /* Conexión por usuario (compartida entre sus equipos). */
+  provider: "sample" | "jira" | "azure";
+  baseUrl?: string;
+  email?: string;
+  /** El token nunca viaja al cliente; sólo si ya hay uno guardado. */
+  hasToken: boolean;
+  /* Mapeo de este equipo dentro de la herramienta. */
+  project?: string;
+  board?: string;
 }
 
 export interface NoteDTO {

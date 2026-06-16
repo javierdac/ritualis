@@ -94,6 +94,62 @@ const PersonSchema = new Schema<IPerson>(
   { timestamps: true },
 );
 
+/* ───────────────────────── Connection (credenciales por usuario) ────────
+   La conexión con Jira / Azure DevOps es POR USUARIO (cada uno usa su propia
+   cuenta y token), no global ni por equipo. 1:1 con User. */
+export type IntegrationProvider = "sample" | "jira" | "azure";
+
+export interface IConnection {
+  _id: Types.ObjectId;
+  owner: Types.ObjectId;
+  provider: IntegrationProvider;
+  /** baseUrl de Jira u organización de Azure DevOps. */
+  baseUrl?: string;
+  /** email (Jira) / organización (Azure DevOps, en baseUrl o acá). */
+  email?: string;
+  /** API token (Jira) o PAT (Azure DevOps). No se expone al cliente. */
+  token?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const ConnectionSchema = new Schema<IConnection>(
+  {
+    owner: { type: Schema.Types.ObjectId, ref: "User", required: true, unique: true, index: true },
+    provider: { type: String, enum: ["sample", "jira", "azure"], default: "sample" },
+    baseUrl: { type: String, trim: true },
+    email: { type: String, trim: true },
+    token: { type: String },
+  },
+  { timestamps: true },
+);
+
+/* ───────────────────────── Integration (mapeo proyecto→board) ───────────
+   El reporte de métricas es POR PROYECTO. Esta entidad dice qué
+   proyecto/board de la herramienta corresponde a cada proyecto de Ritualis.
+   Usa la conexión del usuario que la configura. 1:1 con Project. */
+export interface IIntegration {
+  _id: Types.ObjectId;
+  project: Types.ObjectId;
+  owner: Types.ObjectId;
+  /** Project key (Jira) o nombre de proyecto (Azure DevOps) en la herramienta. */
+  externalProject?: string;
+  /** Board / rapidViewId (Jira) o team (Azure DevOps). */
+  board?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const IntegrationSchema = new Schema<IIntegration>(
+  {
+    project: { type: Schema.Types.ObjectId, ref: "Project", required: true, unique: true, index: true },
+    owner: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    externalProject: { type: String, trim: true },
+    board: { type: String, trim: true },
+  },
+  { timestamps: true },
+);
+
 /* ───────────────────────── Note (por persona) ───────────────────────── */
 export interface INote {
   _id: Types.ObjectId;
@@ -330,6 +386,10 @@ export const User = models.User || model<IUser>("User", UserSchema);
 export const Project = models.Project || model<IProject>("Project", ProjectSchema);
 export const Team = models.Team || model<ITeam>("Team", TeamSchema);
 export const Person = models.Person || model<IPerson>("Person", PersonSchema);
+export const Connection =
+  models.Connection || model<IConnection>("Connection", ConnectionSchema);
+export const Integration =
+  models.Integration || model<IIntegration>("Integration", IntegrationSchema);
 export const Note = models.Note || model<INote>("Note", NoteSchema);
 export const Dynamic = models.Dynamic || model<IDynamic>("Dynamic", DynamicSchema);
 export const Session = models.Session || model<ISession>("Session", SessionSchema);
