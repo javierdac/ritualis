@@ -1,6 +1,7 @@
 "use client";
 
-import { Users, Copy, Square } from "lucide-react";
+import { Users, Copy, Square, LogOut } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,11 +30,18 @@ export function RoomHeader({
   const { session, me, participants } = state;
   const isFac = me?.isFacilitator ?? false;
   const online = participants.filter((p) => p.online);
+  const router = useRouter();
 
   function copyLink() {
     const url = `${window.location.origin}/s/${code}`;
     navigator.clipboard.writeText(url);
     toast.success("Link copiado");
+  }
+
+  // Salir de la sala: el facilitador vuelve a sus sesiones; el invitado, que
+  // pudo entrar por link sin acceso a /app, vuelve a la home.
+  function leave() {
+    router.push(isFac ? "/app/sesiones" : "/");
   }
 
   return (
@@ -83,6 +91,9 @@ export function RoomHeader({
             <Square className="h-4 w-4" /> Cerrar
           </Button>
         )}
+        <Button variant="ghost" size="sm" className="gap-1" onClick={leave}>
+          <LogOut className="h-4 w-4" /> Salir
+        </Button>
         <ThemeToggle />
       </div>
 
