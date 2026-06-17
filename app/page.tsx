@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import {
   ArrowRight,
   Layers,
@@ -162,7 +163,19 @@ export default async function LandingPage() {
           </p>
         </div>
 
-        <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="relative mx-auto mt-12 max-w-4xl overflow-hidden rounded-3xl border border-border/70 shadow-lg">
+          <Image
+            src="/ceremonias-ring.png"
+            alt="El ciclo de las 5 ceremonias Scrum que facilita Ritualis"
+            width={1672}
+            height={941}
+            priority
+            className="h-auto w-full"
+            sizes="(max-width: 896px) 100vw, 896px"
+          />
+        </div>
+
+        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {CEREMONIAS.map((c) => {
             const st = CEREMONIA_STYLE[c];
             return (
