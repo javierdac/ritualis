@@ -14,6 +14,11 @@ export const authConfig = {
       const isLoggedIn = !!auth?.user;
       const { pathname } = nextUrl;
 
+      // Landing pública: la home presenta el producto a visitantes.
+      if (pathname === "/") {
+        return true;
+      }
+
       // Salas en vivo: accesibles para invitados (sin login).
       // La autorización fina se hace por token de participante en la API.
       if (pathname.startsWith("/s/") || pathname.startsWith("/api/sessions")) {
