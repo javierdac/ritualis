@@ -89,7 +89,7 @@ export function MetricsToolbar({
   async function save() {
     setSaving(true);
     // El overlay sólo aplica con primario Jira/Azure; apagado o no aplicable →
-    // limpiamos el mapeo del proyecto (el token guardado por usuario se conserva).
+    // limpiamos el mapeo del overlay (el token guardado del proyecto se conserva).
     const overlay = ghOn && (form.provider === "jira" || form.provider === "azure");
     const payload = {
       ...form,
@@ -169,9 +169,8 @@ export function MetricsToolbar({
           <DialogHeader>
             <DialogTitle>Integración del proyecto</DialogTitle>
             <DialogDescription>
-              La conexión (URL y token) es tuya y se reutiliza en todos tus
-              proyectos. El proyecto/board en la herramienta es propio de este
-              proyecto.
+              Cada proyecto tiene su propia conexión (proveedor, URL y token) y
+              su mapeo al proyecto/board en la herramienta.
             </DialogDescription>
           </DialogHeader>
 
@@ -208,7 +207,7 @@ export function MetricsToolbar({
               <>
                 <div className="rounded-lg border bg-muted/30 p-3">
                   <p className="mb-3 text-xs font-medium text-muted-foreground">
-                    Tu conexión (por usuario)
+                    Conexión del proyecto
                   </p>
                   <div className="space-y-3">
                     <div className="space-y-2">

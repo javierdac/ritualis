@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { dbConnect } from "@/lib/db";
-import { Connection, Integration, Project } from "@/lib/models";
+import { Integration, Project } from "@/lib/models";
 import { getViewer } from "@/lib/session";
 import type { CrudResult } from "./projects";
 
@@ -67,23 +67,24 @@ export async function saveIntegration(
     .lean();
   if (!proj) return { ok: false, error: "Proyecto no encontrado" };
 
-  // Conexión: por usuario. Los tokens sólo se sobrescriben si mandan uno nuevo.
-  const conn: Record<string, unknown> = { provider, baseUrl, email, githubBaseUrl };
-  if (token && token.trim()) conn.token = token.trim();
-  if (githubToken && githubToken.trim()) conn.githubToken = githubToken.trim();
-  await Connection.updateOne(
-    { owner: v.id },
-    { $set: conn, $setOnInsert: { owner: v.id } },
-    { upsert: true },
-  );
-
-  // Mapeo: por proyecto. El form manda el project key externo en `project`.
+  // Toda la config es por proyecto: conexión + mapeo en un solo documento.
+  // El form manda el project key externo en `project`. Los tokens sólo se
+  // sobrescriben si mandan uno nuevo (vacío = no tocar el guardado).
+  const set: Record<string, unknown> = {
+    provider,
+    baseUrl,
+    email,
+    githubBaseUrl,
+    externalProject: project,
+    board,
+    githubOwner,
+    githubProjectNumber,
+  };
+  if (token && token.trim()) set.token = token.trim();
+  if (githubToken && githubToken.trim()) set.githubToken = githubToken.trim();
   await Integration.updateOne(
     { project: projectId },
-    {
-      $set: { externalProject: project, board, githubOwner, githubProjectNumber },
-      $setOnInsert: { project: projectId, owner: v.id },
-    },
+    { $set: set, $setOnInsert: { project: projectId, owner: v.id } },
     { upsert: true },
   );
 

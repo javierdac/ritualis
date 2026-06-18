@@ -31,7 +31,7 @@ export interface PersonDTO {
 }
 
 export interface IntegrationDTO {
-  /* Conexión por usuario (compartida entre sus equipos). */
+  /* Conexión por proyecto (proveedor + credenciales del proyecto). */
   provider: "sample" | "jira" | "azure" | "github";
   baseUrl?: string;
   email?: string;

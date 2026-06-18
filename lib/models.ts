@@ -94,14 +94,19 @@ const PersonSchema = new Schema<IPerson>(
   { timestamps: true },
 );
 
-/* ───────────────────────── Connection (credenciales por usuario) ────────
-   La conexión con Jira / Azure DevOps es POR USUARIO (cada uno usa su propia
-   cuenta y token), no global ni por equipo. 1:1 con User. */
+/* ───────────────────────── Integration (config por proyecto) ────────────
+   Toda la configuración de métricas es POR PROYECTO: proveedor, credenciales
+   y mapeo al board externo viven juntos acá. Las credenciales quedan
+   compartidas a nivel proyecto (quien lo ve usa el token guardado). 1:1 con
+   Project. */
 export type IntegrationProvider = "sample" | "jira" | "azure" | "github";
 
-export interface IConnection {
+export interface IIntegration {
   _id: Types.ObjectId;
+  project: Types.ObjectId;
+  /** Quién configuró la integración (para auditoría). */
   owner: Types.ObjectId;
+  /* ── Conexión con el proveedor primario (por proyecto) ── */
   provider: IntegrationProvider;
   /** baseUrl de Jira, organización de Azure DevOps o API base de GitHub Enterprise. */
   baseUrl?: string;
@@ -109,41 +114,16 @@ export interface IConnection {
   email?: string;
   /** API token (Jira), PAT (Azure DevOps) o PAT (GitHub). No se expone al cliente. */
   token?: string;
-  /* Overlay de GitHub (credenciales por usuario, se suman al primario Jira/Azure). */
-  /** API base de GitHub Enterprise (vacío = github.com). */
-  githubBaseUrl?: string;
-  /** PAT de GitHub para el overlay. No se expone al cliente. */
-  githubToken?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-const ConnectionSchema = new Schema<IConnection>(
-  {
-    owner: { type: Schema.Types.ObjectId, ref: "User", required: true, unique: true, index: true },
-    provider: { type: String, enum: ["sample", "jira", "azure", "github"], default: "sample" },
-    baseUrl: { type: String, trim: true },
-    email: { type: String, trim: true },
-    token: { type: String },
-    githubBaseUrl: { type: String, trim: true },
-    githubToken: { type: String },
-  },
-  { timestamps: true },
-);
-
-/* ───────────────────────── Integration (mapeo proyecto→board) ───────────
-   El reporte de métricas es POR PROYECTO. Esta entidad dice qué
-   proyecto/board de la herramienta corresponde a cada proyecto de Ritualis.
-   Usa la conexión del usuario que la configura. 1:1 con Project. */
-export interface IIntegration {
-  _id: Types.ObjectId;
-  project: Types.ObjectId;
-  owner: Types.ObjectId;
+  /* ── Mapeo del proyecto dentro de la herramienta ── */
   /** Project key (Jira), nombre de proyecto (Azure DevOps) u owner del Project v2 (GitHub). */
   externalProject?: string;
   /** Board / rapidViewId (Jira), team (Azure DevOps) o número del Project v2 (GitHub). */
   board?: string;
-  /* Mapeo del overlay de GitHub (por proyecto), cuando el primario es Jira/Azure. */
+  /* ── Overlay opcional de GitHub (por proyecto), cuando el primario es Jira/Azure ── */
+  /** API base de GitHub Enterprise (vacío = github.com). */
+  githubBaseUrl?: string;
+  /** PAT de GitHub para el overlay. No se expone al cliente. */
+  githubToken?: string;
   /** Owner (organización o usuario) del Project v2 de GitHub. */
   githubOwner?: string;
   /** Número del Project v2 de GitHub. */
@@ -156,8 +136,14 @@ const IntegrationSchema = new Schema<IIntegration>(
   {
     project: { type: Schema.Types.ObjectId, ref: "Project", required: true, unique: true, index: true },
     owner: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    provider: { type: String, enum: ["sample", "jira", "azure", "github"], default: "sample" },
+    baseUrl: { type: String, trim: true },
+    email: { type: String, trim: true },
+    token: { type: String },
     externalProject: { type: String, trim: true },
     board: { type: String, trim: true },
+    githubBaseUrl: { type: String, trim: true },
+    githubToken: { type: String },
     githubOwner: { type: String, trim: true },
     githubProjectNumber: { type: String, trim: true },
   },
@@ -400,8 +386,6 @@ export const User = models.User || model<IUser>("User", UserSchema);
 export const Project = models.Project || model<IProject>("Project", ProjectSchema);
 export const Team = models.Team || model<ITeam>("Team", TeamSchema);
 export const Person = models.Person || model<IPerson>("Person", PersonSchema);
-export const Connection =
-  models.Connection || model<IConnection>("Connection", ConnectionSchema);
 export const Integration =
   models.Integration || model<IIntegration>("Integration", IntegrationSchema);
 export const Note = models.Note || model<INote>("Note", NoteSchema);

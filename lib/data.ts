@@ -4,7 +4,6 @@ import {
   Project,
   Team,
   Person,
-  Connection,
   Integration,
   Note,
   Dynamic,
@@ -196,33 +195,29 @@ export async function getProjectOptions(
   return projects.map((p) => ({ _id: String(p._id), name: p.name as string }));
 }
 
-/** Config de integración para el formulario: conexión del usuario (por
- *  usuario) + mapeo del proyecto. Nunca expone el token. */
+/** Config de integración para el formulario: toda la config es por proyecto.
+ *  Nunca expone el token. */
 export async function getIntegration(
   ownerId: string,
   projectId: string,
 ): Promise<IntegrationDTO> {
   await dbConnect();
-  const [conn, mapping] = await Promise.all([
-    Connection.findOne({ owner: ownerId }).lean(),
-    Integration.findOne({ project: projectId, owner: ownerId }).lean(),
-  ]);
+  const cfg = await Integration.findOne({ project: projectId }).lean();
   return {
-    provider: (conn?.provider as IntegrationDTO["provider"]) ?? "sample",
-    baseUrl: conn?.baseUrl,
-    email: conn?.email,
-    hasToken: Boolean(conn?.token),
-    project: mapping?.externalProject,
-    board: mapping?.board,
-    githubBaseUrl: conn?.githubBaseUrl,
-    hasGithubToken: Boolean(conn?.githubToken),
-    githubOwner: mapping?.githubOwner,
-    githubProjectNumber: mapping?.githubProjectNumber,
+    provider: (cfg?.provider as IntegrationDTO["provider"]) ?? "sample",
+    baseUrl: cfg?.baseUrl,
+    email: cfg?.email,
+    hasToken: Boolean(cfg?.token),
+    project: cfg?.externalProject,
+    board: cfg?.board,
+    githubBaseUrl: cfg?.githubBaseUrl,
+    hasGithubToken: Boolean(cfg?.githubToken),
+    githubOwner: cfg?.githubOwner,
+    githubProjectNumber: cfg?.githubProjectNumber,
   };
 }
 
-/** Snapshot de métricas del proyecto, combinando la conexión del usuario con
- *  el mapeo del proyecto. */
+/** Snapshot de métricas del proyecto, usando la config por proyecto. */
 export async function getProjectMetrics(
   ownerId: string,
   projectId: string,
@@ -233,30 +228,27 @@ export async function getProjectMetrics(
     .select("name")
     .lean();
   if (!project) return null;
-  // Las credenciales son del usuario que mira; el mapeo es del proyecto.
-  const [conn, mapping] = await Promise.all([
-    Connection.findOne({ owner: ownerId }).lean(),
-    Integration.findOne({ project: projectId, owner: ownerId }).lean(),
-  ]);
-  // Overlay de GitHub: sólo si hay PAT (por usuario) y mapeo (por proyecto).
+  // Toda la config (proveedor, credenciales y mapeo) es del proyecto.
+  const cfg = await Integration.findOne({ project: projectId }).lean();
+  // Overlay de GitHub: sólo si hay PAT y mapeo configurados en el proyecto.
   const github =
-    conn?.githubToken && mapping?.githubOwner && mapping?.githubProjectNumber
+    cfg?.githubToken && cfg?.githubOwner && cfg?.githubProjectNumber
       ? {
-          baseUrl: conn.githubBaseUrl,
-          project: mapping.githubOwner,
-          board: mapping.githubProjectNumber,
-          token: conn.githubToken,
+          baseUrl: cfg.githubBaseUrl,
+          project: cfg.githubOwner,
+          board: cfg.githubProjectNumber,
+          token: cfg.githubToken,
         }
       : undefined;
 
   return fetchMetrics({
-    provider: (conn?.provider as MetricsSnapshot["meta"]["provider"]) ?? "sample",
+    provider: (cfg?.provider as MetricsSnapshot["meta"]["provider"]) ?? "sample",
     scopeName: project.name as string,
-    baseUrl: conn?.baseUrl,
-    email: conn?.email,
-    token: conn?.token,
-    project: mapping?.externalProject,
-    board: mapping?.board,
+    baseUrl: cfg?.baseUrl,
+    email: cfg?.email,
+    token: cfg?.token,
+    project: cfg?.externalProject,
+    board: cfg?.board,
     github,
   });
 }
